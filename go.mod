@@ -1,4 +1,4 @@
-module github.com/maoaixiao1314/orbitdb
+module github.com/hetu-project/cRelay-crdt-db
 
 go 1.24
 
