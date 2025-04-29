@@ -27,6 +27,8 @@ import (
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
+
+	// "github.com/multiformats/go-multiaddr"
 	ma "github.com/multiformats/go-multiaddr"
 
 	// Import IPFS data storage drivers
@@ -38,7 +40,9 @@ import (
 )
 
 var (
-	dbAddress = flag.String("db", "", "OrbitDB address to connect to")
+	dbAddress      = flag.String("db", "", "OrbitDB address to connect to")
+	relayPeerID    = flag.String("PeerID", "", "relayPeerID")
+	relayMultiaddr = flag.String("Multiaddr", "", "relayMultiaddr")
 	//dataDir    = flag.String("data", "~/data", "Data directory path")
 	// listenAddr = flag.String("listen", "/ip4/0.0.0.0/tcp/4001", "Libp2p listen address")
 	// ipfssAPI   = flag.String("ipfs", "localhost:5001", "IPFS API endpoint")
@@ -121,6 +125,31 @@ func main() {
 	// })
 	// Explicitly try to enable pubsub
 	// Create OrbitDB instance with explicit pubsub options
+
+	//relayPeerID := "QmRelayPeerID" // 替换为实际值
+	// relayMultiaddr := "/ip4/127.0.0.1/tcp/4001/p2p/QmRelayPeerID" // 使用本地回环地址
+
+	peerID, errs := peer.Decode(*relayPeerID)
+	if errs != nil {
+		fmt.Println("解码 Peer ID 失败:", errs)
+		return
+	}
+
+	_, errs = node.DHT.FindPeer(ctx, peerID)
+	if errs != nil {
+		log.Printf("DHT 中未找到 Relay 节点: %v", errs)
+	}
+
+	err := api.Swarm().Connect(ctx, peer.AddrInfo{
+		ID:    peer.ID(*relayPeerID),
+		Addrs: []ma.Multiaddr{ma.StringCast(*relayMultiaddr)},
+	})
+	if err != nil {
+		log.Printf("连接 Relay 节点失败: %v", err)
+	} else {
+		log.Printf("成功连接到 Relay 节点")
+	}
+
 	orbit, err := orbitdb.NewOrbitDB(ctx, api, &orbitdb.NewOrbitDBOptions{
 		Directory: &orbitDBDir,
 	})

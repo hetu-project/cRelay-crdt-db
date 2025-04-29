@@ -11,6 +11,7 @@ import (
 	orbitdb "berty.tech/go-orbit-db"
 	"berty.tech/go-orbit-db/accesscontroller"
 	"berty.tech/go-orbit-db/iface"
+	"github.com/ipfs/go-cid"
 	ipfsCore "github.com/ipfs/kubo/core"
 	"github.com/ipfs/kubo/core/coreapi"
 )
@@ -62,6 +63,10 @@ func Init() error {
 			return
 		}
 
+		errs := ipfsNode.DHT.Provide(ctx, cid.Undef, true)
+		if errs != nil {
+			log.Printf("DHT 广告失败: %v", err)
+		}
 		// Relay 服务代码
 		peerID := ipfsNode.Identity.String()
 		addrs := ipfsNode.PeerHost.Addrs()
