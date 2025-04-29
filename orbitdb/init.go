@@ -62,6 +62,15 @@ func Init() error {
 			return
 		}
 
+		// Relay 服务代码
+		peerID := ipfsNode.Identity.String()
+		addrs := ipfsNode.PeerHost.Addrs()
+		log.Printf("Relay IPFS 节点信息:")
+		log.Printf("Peer ID: %s", peerID)
+		for _, addr := range addrs {
+			log.Printf("Multiaddr: %s/p2p/%s", addr.String(), peerID)
+		}
+
 		// 获取 IPFS API
 		api, err := coreapi.NewCoreAPI(ipfsNode)
 		if err != nil {
@@ -100,6 +109,8 @@ func Init() error {
 		documentDB = db
 
 		initialized = true
+		addr := documentDB.Address()
+		log.Printf("文档数据库地址: %s", addr)
 		log.Println("数据库初始化成功")
 	})
 

@@ -38,13 +38,13 @@ import (
 )
 
 var (
-	dbAddress  = flag.String("db", "", "OrbitDB address to connect to")
-	dataDir    = flag.String("data", "~/data", "Data directory path")
-	listenAddr = flag.String("listen", "/ip4/0.0.0.0/tcp/4001", "Libp2p listen address")
-	ipfssAPI   = flag.String("ipfs", "localhost:5001", "IPFS API endpoint")
-	port       = flag.String("port", "8080", "API服务端口")
-	StoreType  = "docstore" // eventlog|keyvalue|docstore
-	Create     = true
+	dbAddress = flag.String("db", "", "OrbitDB address to connect to")
+	//dataDir    = flag.String("data", "~/data", "Data directory path")
+	// listenAddr = flag.String("listen", "/ip4/0.0.0.0/tcp/4001", "Libp2p listen address")
+	// ipfssAPI   = flag.String("ipfs", "localhost:5001", "IPFS API endpoint")
+	port      = flag.String("port", "8080", "API服务端口")
+	StoreType = "docstore" // eventlog|keyvalue|docstore
+	Create    = false
 )
 
 func main() {
@@ -53,13 +53,17 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Setup data directories
-	ipfsDir := filepath.Join(*dataDir, "ipfs")
-	orbitDBDir := filepath.Join(*dataDir, "orbitdb")
-	settingsDir := filepath.Join(*dataDir, "settings")
+	// 获取数据目录
+	home, _ := os.UserHomeDir()
 
+	dataDir := filepath.Join(home, "api-data")
+	// Setup data directories
+	ipfsDir := filepath.Join(dataDir, "ipfs")
+	orbitDBDir := filepath.Join(dataDir, "orbitdb")
+	// settingsDir := filepath.Join(dataDir, "settings")
+	log.Printf("abi服务rbitdb数据库地址 %s", orbitDBDir)
 	// Ensure directories exist
-	for _, dir := range []string{ipfsDir, orbitDBDir, settingsDir} {
+	for _, dir := range []string{dataDir, ipfsDir, orbitDBDir} {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			log.Fatalf("Failed to create directory %s: %v", dir, err)
 		}

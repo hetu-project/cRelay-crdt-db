@@ -39,6 +39,7 @@ func (a *OrbitDBAdapter) SaveEvent(ctx context.Context, event *nostr.Event) erro
 	}
 
 	_, err := a.db.Put(ctx, doc)
+
 	return err
 }
 
@@ -78,6 +79,9 @@ func (a *OrbitDBAdapter) QueryEvents(ctx context.Context, filter nostr.Filter) (
 				}
 			}
 
+			if len(filter.IDs) == 0 && len(filter.Authors) == 0 && len(filter.Kinds) == 0 {
+				return true, nil
+			}
 			// 可以添加更多过滤条件...
 
 			return true, nil
