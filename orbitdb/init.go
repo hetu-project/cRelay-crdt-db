@@ -65,7 +65,7 @@ func Init() error {
 
 		errs := ipfsNode.DHT.Provide(ctx, cid.Undef, true)
 		if errs != nil {
-			log.Printf("DHT 广告失败: %v", err)
+			log.Printf("DHT 广告失败: %v", errs)
 		}
 		// Relay 服务代码
 		peerID := ipfsNode.Identity.String()
