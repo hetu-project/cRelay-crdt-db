@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 
 	"berty.tech/go-orbit-db/iface"
 	"github.com/nbd-wtf/go-nostr"
@@ -82,8 +83,52 @@ func (a *OrbitDBAdapter) QueryEvents(ctx context.Context, filter nostr.Filter) (
 			if len(filter.IDs) == 0 && len(filter.Authors) == 0 && len(filter.Kinds) == 0 {
 				return true, nil
 			}
-			// 可以添加更多过滤条件...
 
+			// 过滤 #sid 标签
+			// 检查标签过滤条件
+			if len(filter.Tags) > 0 {
+				tags, ok := event["tags"].([]interface{})
+				if !ok {
+					return false, nil
+				}
+
+				// 对每个标签过滤条件进行检查
+				for tagName, tagValues := range filter.Tags {
+					if len(tagValues) == 0 {
+						continue
+					}
+
+					// 查找事件中是否有匹配的标签
+					found := false
+					for _, tag := range tags {
+						tagArray, ok := tag.([]interface{})
+						if !ok || len(tagArray) < 2 {
+							continue
+						}
+
+						name, ok := tagArray[0].(string)
+						if !ok || !strings.EqualFold(name, tagName) {
+							continue
+						}
+
+						value, ok := tagArray[1].(string)
+						if !ok {
+							continue
+						}
+
+						// 检查标签值是否在过滤条件中
+						if contains(tagValues, value) {
+							found = true
+							break
+						}
+					}
+
+					// 如果没有找到匹配的标签，则跳过此事件
+					if !found {
+						return false, nil
+					}
+				}
+			}
 			return true, nil
 		}
 

@@ -40,15 +40,15 @@ import (
 )
 
 var (
-	dbAddress      = flag.String("db", "", "OrbitDB address to connect to")
-	relayPeerID    = flag.String("PeerID", "", "relayPeerID")
+	dbAddress = flag.String("db", "", "OrbitDB address to connect to")
+	//relayPeerID    = flag.String("PeerID", "", "relayPeerID")
 	relayMultiaddr = flag.String("Multiaddr", "", "relayMultiaddr")
 	//dataDir    = flag.String("data", "~/data", "Data directory path")
 	// listenAddr = flag.String("listen", "/ip4/0.0.0.0/tcp/4001", "Libp2p listen address")
 	// ipfssAPI   = flag.String("ipfs", "localhost:5001", "IPFS API endpoint")
 	port      = flag.String("port", "8080", "API服务端口")
 	StoreType = "docstore" // eventlog|keyvalue|docstore
-	Create    = false
+	Create    = true
 )
 
 func main() {
@@ -129,26 +129,21 @@ func main() {
 	//relayPeerID := "QmRelayPeerID" // 替换为实际值
 	// relayMultiaddr := "/ip4/127.0.0.1/tcp/4001/p2p/QmRelayPeerID" // 使用本地回环地址
 
-	peerID, errs := peer.Decode(*relayPeerID)
-	if errs != nil {
-		fmt.Println("解码 Peer ID 失败:", errs)
-		return
-	}
+	// peerID, errs := peer.Decode(*relayPeerID)
+	// if errs != nil {
+	// 	fmt.Println("解码 Peer ID 失败:", errs)
+	// 	return
+	// }
 
-	_, errs = node.DHT.FindPeer(ctx, peerID)
-	if errs != nil {
-		log.Printf("DHT 中未找到 Relay 节点: %v", errs)
-	}
+	// _, errs = node.DHT.FindPeer(ctx, peerID)
+	// if errs != nil {
+	// 	log.Printf("DHT 中未找到 Relay 节点: %v", errs)
+	// }
 
-	err := api.Swarm().Connect(ctx, peer.AddrInfo{
-		ID:    peer.ID(*relayPeerID),
-		Addrs: []ma.Multiaddr{ma.StringCast(*relayMultiaddr)},
-	})
-	if err != nil {
-		log.Printf("连接 Relay 节点失败: %v", err)
-	} else {
-		log.Printf("成功连接到 Relay 节点")
-	}
+	// err := api.Swarm().Connect(ctx, peer.AddrInfo{
+	// 	ID:    peer.ID(*relayPeerID),
+	// 	Addrs: []ma.Multiaddr{ma.StringCast(*relayMultiaddr)},
+	// })
 
 	orbit, err := orbitdb.NewOrbitDB(ctx, api, &orbitdb.NewOrbitDBOptions{
 		Directory: &orbitDBDir,
@@ -169,16 +164,29 @@ func main() {
 		if err != nil {
 			log.Fatalf("Failed to open database: %v", err)
 		}
+		addr, _ := ma.NewMultiaddr(*relayMultiaddr)
+		addrInfo, _ := peer.AddrInfoFromP2pAddr(addr)
+		err = api.Swarm().Connect(ctx, *addrInfo)
+		if err != nil {
+			log.Printf("连接 Relay 节点失败: %v", err)
+		} else {
+			log.Printf("成功连接到 Relay 节点")
+		}
+		// peers, _ := api.Swarm().Peers(ctx)
+		// for _, p := range peers {
+		// 	log.Printf("已连接 Peer: %s", p.ID())
+		// }
 		defer orbit.Close()
 		db = dbInstance.(iface.DocumentStore)
-
+		newadd := db.Address().String()
+		log.Printf("API数据库地址 %s", newadd)
 		// 创建API路由器
 		router := router.NewRouter(adapter.NewOrbitDBAdapter(db))
 
 		// 启动HTTP服务器
-		addr := fmt.Sprintf(":%s", *port)
-		log.Printf("API服务启动在 %s", addr)
-		if err := http.ListenAndServe(addr, router.Handler()); err != nil {
+		addrs := fmt.Sprintf(":%s", *port)
+		log.Printf("API服务启动在 %s", addrs)
+		if err := http.ListenAndServe(addrs, router.Handler()); err != nil {
 			log.Fatalf("HTTP服务器错误: %v", err)
 		}
 

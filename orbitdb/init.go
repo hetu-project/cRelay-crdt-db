@@ -101,6 +101,7 @@ func Init() error {
 				Type: "ipfs",
 				Access: map[string][]string{
 					"write": {"*"},
+					"read":  {"*"},
 				},
 			},
 			Directory: &orbitDBDir,
@@ -115,7 +116,7 @@ func Init() error {
 		documentDB = db
 
 		initialized = true
-		addr := documentDB.Address()
+		addr := documentDB.Address().String()
 		log.Printf("文档数据库地址: %s", addr)
 		log.Println("数据库初始化成功")
 	})
