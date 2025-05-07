@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	// "fmt"
 	"net/http"
 	"strconv"
 
@@ -129,3 +130,149 @@ func (h *EventHandlers) DeleteEvent(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusNoContent)
 }
+
+// func (h *EventHandlers) GetSubspace(w http.ResponseWriter, r *http.Request) {
+// 	vars := mux.Vars(r)
+// 	id := vars["id"]
+
+// 	// 验证子空间ID格式
+// 	// if !isValidSubspaceID(id) {
+// 	// 	http.Error(w, "无效的子空间ID格式", http.StatusBadRequest)
+// 	// 	return
+// 	// }
+
+// 	// 获取子空间因果关系数据
+// 	causality, err := h.store.GetSubspaceCausality(r.Context(), id)
+// 	if err != nil {
+// 		http.Error(w, fmt.Sprintf("获取子空间数据失败: %v", err), http.StatusInternalServerError)
+// 		return
+// 	}
+
+// 	if causality == nil {
+// 		http.Error(w, "子空间不存在", http.StatusNotFound)
+// 		return
+// 	}
+
+// 	// 返回JSON数据
+// 	w.Header().Set("Content-Type", "application/json")
+// 	json.NewEncoder(w).Encode(causality)
+// }
+
+// // GetSubspaceEvents 获取子空间事件
+// func (h *EventHandlers) GetSubspaceEvents(w http.ResponseWriter, r *http.Request) {
+// 	vars := mux.Vars(r)
+// 	id := vars["id"]
+
+// 	// 验证子空间ID格式
+// 	// if !isValidSubspaceID(id) {
+// 	// 	http.Error(w, "无效的子空间ID格式", http.StatusBadRequest)
+// 	// 	return
+// 	// }
+
+// 	// 查询子空间事件
+// 	eventCh, err := h.store.QuerySubspaceEvents(r.Context(), id)
+// 	if err != nil {
+// 		http.Error(w, fmt.Sprintf("查询子空间事件失败: %v", err), http.StatusInternalServerError)
+// 		return
+// 	}
+
+// 	// 收集所有事件
+// 	var events []*nostr.Event
+// 	for event := range eventCh {
+// 		events = append(events, event)
+// 	}
+
+// 	// 返回JSON数据
+// 	w.Header().Set("Content-Type", "application/json")
+// 	json.NewEncoder(w).Encode(events)
+// }
+
+// // ListSubspaces 列出所有子空间
+// func (api *CausalityAPI) ListSubspaces(w http.ResponseWriter, r *http.Request) {
+// 	// 获取查询参数
+// 	query := r.URL.Query()
+// 	sinceStr := query.Get("since")
+// 	untilStr := query.Get("until")
+
+// 	// 解析时间范围
+// 	var since, until *int64
+// 	if sinceStr != "" {
+// 		var sinceVal int64
+// 		if _, err := fmt.Sscanf(sinceStr, "%d", &sinceVal); err == nil {
+// 			since = &sinceVal
+// 		}
+// 	}
+
+// 	if untilStr != "" {
+// 		var untilVal int64
+// 		if _, err := fmt.Sscanf(untilStr, "%d", &untilVal); err == nil {
+// 			until = &untilVal
+// 		}
+// 	}
+
+// 	// 创建过滤器函数
+// 	filter := func(c *SubspaceCausality) bool {
+// 		if since != nil && c.Updated < *since {
+// 			return false
+// 		}
+// 		if until != nil && c.Updated > *until {
+// 			return false
+// 		}
+// 		return true
+// 	}
+
+// 	// 查询子空间
+// 	subspaces, err := api.causalityMgr.QuerySubspaces(r.Context(), filter)
+// 	if err != nil {
+// 		http.Error(w, fmt.Sprintf("查询子空间失败: %v", err), http.StatusInternalServerError)
+// 		return
+// 	}
+
+// 	// 返回JSON数据
+// 	w.Header().Set("Content-Type", "application/json")
+// 	json.NewEncoder(w).Encode(subspaces)
+// }
+
+// // CreateSubspaceEvent 创建一个子空间事件
+// func (api *CausalityAPI) CreateSubspaceEvent(subspaceID string, pubkey string, keyID string, counter uint64) (*nostr.Event, error) {
+// 	// 验证子空间ID
+// 	if !isValidSubspaceID(subspaceID) {
+// 		return nil, fmt.Errorf("无效的子空间ID格式")
+// 	}
+
+// 	// 创建事件
+// 	event := &nostr.Event{
+// 		PubKey:    pubkey,
+// 		CreatedAt: nostr.Now(),
+// 		Kind:      30304, // 子空间操作的自定义事件类型
+// 		Tags: []nostr.Tag{
+// 			{"d", "subspace_op"},
+// 			{"sid", subspaceID},
+// 			{"causal", keyID, fmt.Sprintf("%d", counter)},
+// 		},
+// 		Content: "", // 内容可以根据需要设置
+// 	}
+
+// 	// 计算事件ID
+// 	err := event.Sign() // 注意：在实际使用中，应该由客户端签署
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	// 保存事件
+// 	ctx := context.Background()
+// 	err = api.adapter.SaveEvent(ctx, event)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	return event, nil
+// }
+
+// // AddCausalityRoutesToRouter 添加因果关系路由到主路由器
+// func AddCausalityRoutesToRouter(router *mux.Router, adapter *OrbitDBAdapter) {
+// 	api := NewCausalityAPI(adapter)
+// 	if api != nil {
+// 		api.RegisterRoutes(router)
+// 	}
+// }

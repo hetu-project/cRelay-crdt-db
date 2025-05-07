@@ -12,13 +12,15 @@ import (
 
 // OrbitDBAdapter 实现 eventstore.Store 接口
 type OrbitDBAdapter struct {
-	db iface.DocumentStore
+	db           iface.DocumentStore
+	causalityMgr *CausalityManager
 }
 
 // NewOrbitDBAdapter 创建一个新的 OrbitDB 适配器
 func NewOrbitDBAdapter(db iface.DocumentStore) *OrbitDBAdapter {
 	return &OrbitDBAdapter{
-		db: db,
+		db:           db,
+		causalityMgr: NewCausalityManager(db), // 使用同一个数据库实例
 	}
 }
 
@@ -37,9 +39,18 @@ func (a *OrbitDBAdapter) SaveEvent(ctx context.Context, event *nostr.Event) erro
 		"content":    event.Content,
 		"sig":        event.Sig,
 		"tags":       event.Tags,
+		"doc_type":   DocTypeNostrEvent, // 添加文档类型标识
 	}
 
 	_, err := a.db.Put(ctx, doc)
+
+	// 更新因果关系
+	if a.causalityMgr != nil {
+		// 尝试更新因果关系，但不影响事件存储
+		if updateErr := a.causalityMgr.UpdateFromEvent(ctx, event); updateErr != nil {
+			log.Printf("警告: 更新因果关系失败: %v", updateErr)
+		}
+	}
 
 	return err
 }
@@ -55,6 +66,12 @@ func (a *OrbitDBAdapter) QueryEvents(ctx context.Context, filter nostr.Filter) (
 		queryFn := func(doc interface{}) (bool, error) {
 			event, ok := doc.(map[string]interface{})
 			if !ok {
+				return false, nil
+			}
+
+			// 只处理nostr事件类型的文档
+			docType, ok := event["doc_type"].(string)
+			if !ok || docType != DocTypeNostrEvent {
 				return false, nil
 			}
 
@@ -261,6 +278,36 @@ func contains(slice []string, item string) bool {
 		}
 	}
 	return false
+}
+
+// GetSubspaceCausality 获取子空间的因果关系数据
+func (a *OrbitDBAdapter) GetSubspaceCausality(ctx context.Context, subspaceID string) (*SubspaceCausality, error) {
+	return a.causalityMgr.GetSubspaceCausality(ctx, subspaceID)
+}
+
+// QuerySubspaces 根据条件查询子空间
+func (a *OrbitDBAdapter) QuerySubspaces(ctx context.Context, filter func(*SubspaceCausality) bool) ([]*SubspaceCausality, error) {
+	return a.causalityMgr.QuerySubspaces(ctx, filter)
+}
+
+// UpdateFromEvent 从事件更新因果关系
+func (a *OrbitDBAdapter) UpdateFromEvent(ctx context.Context, event *nostr.Event) error {
+	return a.causalityMgr.UpdateFromEvent(ctx, event)
+}
+
+// GetCausalityEvents 获取与特定子空间相关的所有事件
+func (a *OrbitDBAdapter) GetCausalityEvents(ctx context.Context, subspaceID string) ([]string, error) {
+	return a.causalityMgr.GetCausalityEvents(ctx, subspaceID)
+}
+
+// GetCausalityKey 获取特定子空间的特定因果关系键
+func (a *OrbitDBAdapter) GetCausalityKey(ctx context.Context, subspaceID string, keyID uint32) (uint64, error) {
+	return a.causalityMgr.GetCausalityKey(ctx, subspaceID, keyID)
+}
+
+// GetAllCausalityKeys 获取特定子空间的所有因果关系键
+func (a *OrbitDBAdapter) GetAllCausalityKeys(ctx context.Context, subspaceID string) (map[uint32]uint64, error) {
+	return a.causalityMgr.GetAllCausalityKeys(ctx, subspaceID)
 }
 
 // 辅助函数：检查切片中是否包含某个整数

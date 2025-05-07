@@ -22,6 +22,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/hetu-project/cRelay-crdt-db/orbitdb"
 	"github.com/nbd-wtf/go-nostr"
 )
 
@@ -48,6 +49,24 @@ type Store interface {
 
 	// Close 关闭存储连接
 	// Close() error
+
+	// 新增方法：获取子空间的因果关系数据
+	GetSubspaceCausality(ctx context.Context, subspaceID string) (*orbitdb.SubspaceCausality, error)
+
+	// 新增方法：查询子空间
+	QuerySubspaces(ctx context.Context, filter func(*orbitdb.SubspaceCausality) bool) ([]*orbitdb.SubspaceCausality, error)
+
+	// UpdateFromEvent 从事件更新因果关系
+	UpdateFromEvent(ctx context.Context, event *nostr.Event) error
+
+	//GetCausalityEvents 获取与特定子空间相关的所有事件
+	GetCausalityEvents(ctx context.Context, subspaceID string) ([]string, error)
+
+	// GetCausalityKey 获取特定子空间的特定因果关系键
+	GetCausalityKey(ctx context.Context, subspaceID string, keyID uint32) (uint64, error)
+
+	// GetAllCausalityKeys 获取特定子空间的所有因果关系键
+	GetAllCausalityKeys(ctx context.Context, subspaceID string) (map[uint32]uint64, error)
 }
 
 // StoreFactory 用于创建存储实例的工厂接口
