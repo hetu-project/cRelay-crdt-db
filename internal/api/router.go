@@ -30,6 +30,7 @@ func (r *Router) Handler() http.Handler {
 	// Create event handlers
 	eventHandlers := handlers.NewEventHandlers(r.store)
 	causalityHandlers := handlers.NewCausalityHandlers(r.store)
+	userHandlers := handlers.NewUserHandlers(r.store)
 
 	// Event API endpoints
 	router.HandleFunc("/events", eventHandlers.SaveEvent).Methods(http.MethodPost)
@@ -52,6 +53,14 @@ func (r *Router) Handler() http.Handler {
 	router.HandleFunc("/subspaces/{id}/events", causalityHandlers.GetSubspaceEvents).Methods(http.MethodGet)
 	router.HandleFunc("/subspaces/{id}/keys/{key}", causalityHandlers.GetCausalityKey).Methods(http.MethodGet)
 	//router.HandleFunc("/subspaces/events", causalityHandlers.CreateSubspaceEvent).Methods(http.MethodPost)
+
+	// User Stats API endpoints
+	router.HandleFunc("/users/{id}/stats", userHandlers.GetUserStats).Methods(http.MethodGet)
+	router.HandleFunc("/users/{id}/subspaces", userHandlers.GetUserSubspaces).Methods(http.MethodGet)
+	router.HandleFunc("/users/{id}/invites", userHandlers.GetUserInvites).Methods(http.MethodGet)
+	router.HandleFunc("/users/top", userHandlers.ListTopUsers).Methods(http.MethodGet)
+	router.HandleFunc("/subspaces/{id}/users", userHandlers.GetSubspaceUsers).Methods(http.MethodGet)
+
 	// Health check endpoint
 	router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)

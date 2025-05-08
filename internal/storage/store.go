@@ -67,6 +67,17 @@ type Store interface {
 
 	// GetAllCausalityKeys 获取特定子空间的所有因果关系键
 	GetAllCausalityKeys(ctx context.Context, subspaceID string) (map[uint32]uint64, error)
+
+	// 新增用户统计相关方法
+
+	// GetUserStats 获取用户统计数据
+	GetUserStats(ctx context.Context, userID string) (*orbitdb.UserStats, error)
+
+	// QueryUsersBySubspace 查询特定子空间的所有用户
+	QueryUsersBySubspace(ctx context.Context, subspaceID string) ([]*orbitdb.UserStats, error)
+
+	// QueryUserStats 根据条件查询用户统计
+	QueryUserStats(ctx context.Context, filter func(*orbitdb.UserStats) bool) ([]*orbitdb.UserStats, error)
 }
 
 // StoreFactory 用于创建存储实例的工厂接口

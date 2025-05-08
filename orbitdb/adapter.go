@@ -14,6 +14,7 @@ import (
 type OrbitDBAdapter struct {
 	db           iface.DocumentStore
 	causalityMgr *CausalityManager
+	userStatsMgr *UserStatsManager
 }
 
 // NewOrbitDBAdapter 创建一个新的 OrbitDB 适配器
@@ -21,6 +22,7 @@ func NewOrbitDBAdapter(db iface.DocumentStore) *OrbitDBAdapter {
 	return &OrbitDBAdapter{
 		db:           db,
 		causalityMgr: NewCausalityManager(db), // 使用同一个数据库实例
+		userStatsMgr: NewUserStatsManager(db), // 使用同一个数据库实例
 	}
 }
 
@@ -44,6 +46,10 @@ func (a *OrbitDBAdapter) SaveEvent(ctx context.Context, event *nostr.Event) erro
 
 	_, err := a.db.Put(ctx, doc)
 
+	if err != nil {
+		return err
+	}
+
 	// 更新因果关系
 	if a.causalityMgr != nil {
 		// 尝试更新因果关系，但不影响事件存储
@@ -52,7 +58,15 @@ func (a *OrbitDBAdapter) SaveEvent(ctx context.Context, event *nostr.Event) erro
 		}
 	}
 
-	return err
+	// 更新用户统计
+	if a.userStatsMgr != nil {
+		// 尝试更新用户统计，但不影响事件存储
+		if updateErr := a.userStatsMgr.UpdateUserStatsFromEvent(ctx, event); updateErr != nil {
+			log.Printf("警告: 更新用户统计失败: %v", updateErr)
+		}
+	}
+
+	return nil
 }
 
 func (a *OrbitDBAdapter) QueryEvents(ctx context.Context, filter nostr.Filter) (chan *nostr.Event, error) {
@@ -308,6 +322,21 @@ func (a *OrbitDBAdapter) GetCausalityKey(ctx context.Context, subspaceID string,
 // GetAllCausalityKeys 获取特定子空间的所有因果关系键
 func (a *OrbitDBAdapter) GetAllCausalityKeys(ctx context.Context, subspaceID string) (map[uint32]uint64, error) {
 	return a.causalityMgr.GetAllCausalityKeys(ctx, subspaceID)
+}
+
+// GetUserStats 获取用户统计数据
+func (a *OrbitDBAdapter) GetUserStats(ctx context.Context, userID string) (*UserStats, error) {
+	return a.userStatsMgr.GetUserStats(ctx, userID)
+}
+
+// QueryUsersBySubspace 查询特定子空间的所有用户
+func (a *OrbitDBAdapter) QueryUsersBySubspace(ctx context.Context, subspaceID string) ([]*UserStats, error) {
+	return a.userStatsMgr.QueryUsersBySubspace(ctx, subspaceID)
+}
+
+// QueryUserStats 根据条件查询用户统计
+func (a *OrbitDBAdapter) QueryUserStats(ctx context.Context, filter func(*UserStats) bool) ([]*UserStats, error) {
+	return a.userStatsMgr.QueryUserStats(ctx, filter)
 }
 
 // 辅助函数：检查切片中是否包含某个整数
