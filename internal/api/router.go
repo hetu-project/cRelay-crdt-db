@@ -33,10 +33,10 @@ func (r *Router) Handler() http.Handler {
 	userHandlers := handlers.NewUserHandlers(r.store)
 
 	// Event API endpoints
-	router.HandleFunc("/events", eventHandlers.SaveEvent).Methods(http.MethodPost)
-	router.HandleFunc("/events/{id}", eventHandlers.GetEvent).Methods(http.MethodGet)
-	router.HandleFunc("/events/query", eventHandlers.QueryEvents).Methods(http.MethodPost)
-	router.HandleFunc("/events/{id}", eventHandlers.DeleteEvent).Methods(http.MethodDelete)
+	router.HandleFunc("api/events", eventHandlers.SaveEvent).Methods(http.MethodPost)
+	router.HandleFunc("api/events/{id}", eventHandlers.GetEvent).Methods(http.MethodGet)
+	router.HandleFunc("api/events/query", eventHandlers.QueryEvents).Methods(http.MethodPost)
+	router.HandleFunc("api/events/{id}", eventHandlers.DeleteEvent).Methods(http.MethodDelete)
 
 	// 子空间信息端点
 	// router.HandleFunc("/subspace/{id}", eventHandlers.GetSubspace).Methods("GET")
@@ -48,21 +48,21 @@ func (r *Router) Handler() http.Handler {
 	// router.HandleFunc("/subspaces", eventHandlers.ListSubspaces).Methods("GET")
 
 	// Causality API endpoints
-	router.HandleFunc("/subspaces", causalityHandlers.ListSubspaces).Methods(http.MethodGet)
-	router.HandleFunc("/subspaces/{id}", causalityHandlers.GetSubspaceCausality).Methods(http.MethodGet)
-	router.HandleFunc("/subspaces/{id}/events", causalityHandlers.GetSubspaceEvents).Methods(http.MethodGet)
-	router.HandleFunc("/subspaces/{id}/keys/{key}", causalityHandlers.GetCausalityKey).Methods(http.MethodGet)
+	router.HandleFunc("api/subspaces", causalityHandlers.ListSubspaces).Methods(http.MethodGet)
+	router.HandleFunc("api/subspaces/{id}", causalityHandlers.GetSubspaceCausality).Methods(http.MethodGet)
+	router.HandleFunc("api/subspaces/{id}/events", causalityHandlers.GetSubspaceEvents).Methods(http.MethodGet)
+	router.HandleFunc("api/subspaces/{id}/keys/{key}", causalityHandlers.GetCausalityKey).Methods(http.MethodGet)
 	//router.HandleFunc("/subspaces/events", causalityHandlers.CreateSubspaceEvent).Methods(http.MethodPost)
 
 	// User Stats API endpoints
-	router.HandleFunc("/users/{id}/stats", userHandlers.GetUserStats).Methods(http.MethodGet)
-	router.HandleFunc("/users/{id}/subspaces", userHandlers.GetUserSubspaces).Methods(http.MethodGet)
-	router.HandleFunc("/users/{id}/invites", userHandlers.GetUserInvites).Methods(http.MethodGet)
-	router.HandleFunc("/users/top", userHandlers.ListTopUsers).Methods(http.MethodGet)
-	router.HandleFunc("/subspaces/{id}/users", userHandlers.GetSubspaceUsers).Methods(http.MethodGet)
+	router.HandleFunc("api/users/{id}/stats", userHandlers.GetUserStats).Methods(http.MethodGet)
+	router.HandleFunc("api/users/{id}/subspaces", userHandlers.GetUserSubspaces).Methods(http.MethodGet)
+	router.HandleFunc("api/users/{id}/invites", userHandlers.GetUserInvites).Methods(http.MethodGet)
+	router.HandleFunc("api/users/top", userHandlers.ListTopUsers).Methods(http.MethodGet)
+	router.HandleFunc("api/subspaces/{id}/users", userHandlers.GetSubspaceUsers).Methods(http.MethodGet)
 
 	// Health check endpoint
-	router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+	router.HandleFunc("api/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
 	}).Methods(http.MethodGet)
