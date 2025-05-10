@@ -212,7 +212,7 @@ func (cm *CausalityManager) UpdateFromEvent(ctx context.Context, event *nostr.Ev
 		// 对于其他类型的事件，寻找对应的因果关系键并更新计数器
 		var opName string
 		for _, tag := range event.Tags {
-			if len(tag) >= 2 && tag[0] == "op" {
+			if len(tag) >= 2 && tag[0] == "ops" {
 				opName = tag[1]
 				break
 			}
