@@ -111,9 +111,9 @@ func (a *OrbitDBAdapter) QueryEvents(ctx context.Context, filter nostr.Filter) (
 				}
 			}
 
-			if len(filter.IDs) == 0 && len(filter.Authors) == 0 && len(filter.Kinds) == 0 {
-				return true, nil
-			}
+			// if len(filter.IDs) == 0 && len(filter.Authors) == 0 && len(filter.Kinds) == 0 {
+			// 	return true, nil
+			// }
 
 			// 过滤 #sid 标签
 			// 检查标签过滤条件
@@ -282,6 +282,47 @@ func (a *OrbitDBAdapter) CountEvents(ctx context.Context, filter nostr.Filter) (
 	a.db.Query(ctx, queryFn)
 
 	return count, nil
+}
+
+func (a *OrbitDBAdapter) ReplaceEvent(ctx context.Context, event *nostr.Event) error {
+	if event == nil {
+		return fmt.Errorf("事件不能为空")
+	}
+
+	doc := map[string]interface{}{
+		"_id":        event.ID,
+		"pubkey":     event.PubKey,
+		"created_at": event.CreatedAt,
+		"kind":       event.Kind,
+		"content":    event.Content,
+		"sig":        event.Sig,
+		"tags":       event.Tags,
+		"doc_type":   DocTypeNostrEvent, // 添加文档类型标识
+	}
+
+	_, err := a.db.Put(ctx, doc)
+
+	if err != nil {
+		return err
+	}
+
+	// 更新因果关系
+	if a.causalityMgr != nil {
+		// 尝试更新因果关系，但不影响事件存储
+		if updateErr := a.causalityMgr.UpdateFromEvent(ctx, event); updateErr != nil {
+			log.Printf("警告: 更新因果关系失败: %v", updateErr)
+		}
+	}
+
+	// 更新用户统计
+	if a.userStatsMgr != nil {
+		// 尝试更新用户统计，但不影响事件存储
+		if updateErr := a.userStatsMgr.UpdateUserStatsFromEvent(ctx, event); updateErr != nil {
+			log.Printf("警告: 更新用户统计失败: %v", updateErr)
+		}
+	}
+
+	return nil
 }
 
 // 辅助函数：检查切片中是否包含某个字符串

@@ -65,11 +65,103 @@ func (h *EventHandlers) GetEvent(w http.ResponseWriter, r *http.Request) {
 }
 
 // QueryEvents 处理查询多个事件的请求
+// func (h *EventHandlers) QueryEvents(w http.ResponseWriter, r *http.Request) {
+// 	var filter nostr.Filter
+// 	if err := json.NewDecoder(r.Body).Decode(&filter); err != nil {
+// 		http.Error(w, "无效的过滤器", http.StatusBadRequest)
+// 		return
+// 	}
+
+// 	limit := 100 // 默认限制
+// 	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+// 		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+// 			limit = l
+// 		}
+// 	}
+
+// 	events := make([]*nostr.Event, 0)
+// 	eventChan, err := h.store.QueryEvents(r.Context(), filter)
+// 	if err != nil {
+// 		http.Error(w, "查询事件失败", http.StatusInternalServerError)
+// 		return
+// 	}
+
+// 	count := 0
+// 	for event := range eventChan {
+// 		if count >= limit {
+// 			break
+// 		}
+// 		events = append(events, event)
+// 		count++
+// 	}
+
+// 	json.NewEncoder(w).Encode(events)
+// }
+
 func (h *EventHandlers) QueryEvents(w http.ResponseWriter, r *http.Request) {
-	var filter nostr.Filter
-	if err := json.NewDecoder(r.Body).Decode(&filter); err != nil {
-		http.Error(w, "无效的过滤器", http.StatusBadRequest)
+	// 使用通用map解析请求，以支持更灵活的过滤条件
+	var queryParams map[string]interface{}
+	if err := json.NewDecoder(r.Body).Decode(&queryParams); err != nil {
+		http.Error(w, "无效的过滤器格式", http.StatusBadRequest)
 		return
+	}
+
+	// 构建标准 nostr 过滤器
+	filter := nostr.Filter{}
+
+	// 处理标准过滤字段
+	if ids, ok := queryParams["ids"].([]interface{}); ok {
+		for _, id := range ids {
+			if idStr, ok := id.(string); ok {
+				filter.IDs = append(filter.IDs, idStr)
+			}
+		}
+	}
+
+	if authors, ok := queryParams["authors"].([]interface{}); ok {
+		for _, author := range authors {
+			if authorStr, ok := author.(string); ok {
+				filter.Authors = append(filter.Authors, authorStr)
+			}
+		}
+	}
+
+	if kinds, ok := queryParams["kinds"].([]interface{}); ok {
+		for _, kind := range kinds {
+			if kindFloat, ok := kind.(float64); ok {
+				filter.Kinds = append(filter.Kinds, int(kindFloat))
+			}
+		}
+	}
+
+	if limit, ok := queryParams["limit"].(float64); ok {
+		filter.Limit = int(limit)
+	}
+
+	// 特殊处理自定义标签过滤
+	filter.Tags = make(nostr.TagMap)
+
+	// 处理 sid 标签
+	if sid, ok := queryParams["sid"].([]interface{}); ok && len(sid) > 0 {
+		sidValues := make([]string, 0)
+		for _, s := range sid {
+			if sidStr, ok := s.(string); ok {
+				sidValues = append(sidValues, sidStr)
+			}
+		}
+		filter.Tags["sid"] = sidValues
+	}
+
+	// 处理parent标签
+
+	if parent, ok := queryParams["parent"].([]interface{}); ok && len(parent) > 0 {
+		parentValues := make([]string, 0)
+		for _, s := range parent {
+			if parentStr, ok := s.(string); ok {
+				parentValues = append(parentValues, parentStr)
+			}
+		}
+		filter.Tags["parent"] = parentValues
 	}
 
 	limit := 100 // 默认限制
@@ -77,6 +169,9 @@ func (h *EventHandlers) QueryEvents(w http.ResponseWriter, r *http.Request) {
 		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
 			limit = l
 		}
+	}
+	if filter.Limit == 0 || filter.Limit > limit {
+		filter.Limit = limit
 	}
 
 	events := make([]*nostr.Event, 0)
@@ -88,13 +183,14 @@ func (h *EventHandlers) QueryEvents(w http.ResponseWriter, r *http.Request) {
 
 	count := 0
 	for event := range eventChan {
-		if count >= limit {
+		if count >= filter.Limit {
 			break
 		}
 		events = append(events, event)
 		count++
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(events)
 }
 
