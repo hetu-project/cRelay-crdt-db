@@ -24,7 +24,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// MockDocumentStore 是一个模拟的 DocumentStore 接口实现
+// MockDocumentStore is a mock implementation of the DocumentStore interface
 type MockDocumentStore struct {
 	mock.Mock
 }
@@ -185,31 +185,31 @@ func (m *MockDocumentStore) UnsubscribeAll() {
 	m.Called()
 }
 
-// 测试时间戳过滤功能
+// Test timestamp filtering functionality
 func TestQueryEventsWithTimestampFilter(t *testing.T) {
-	// 创建模拟存储
+	// Create mock store
 	mockDB := new(MockDocumentStore)
 	adapter := NewOrbitDBAdapter(mockDB)
 
-	// 创建测试事件
+	// Create test events
 	now := time.Now().Unix()
 	event1 := map[string]interface{}{
 		"_id":        "event1",
-		"created_at": float64(now - 3600), // 1小时前
+		"created_at": float64(now - 3600), // 1 hour ago
 		"content":    "test event 1",
 		"doc_type":   DocTypeNostrEvent,
 	}
 	event2 := map[string]interface{}{
 		"_id":        "event2",
-		"created_at": float64(now), // 现在
+		"created_at": float64(now), // now
 		"content":    "test event 2",
 		"doc_type":   DocTypeNostrEvent,
 	}
 
-	// 设置模拟行为
+	// Set up mock behavior
 	mockDB.On("Query", mock.Anything, mock.Anything).Return([]interface{}{event1, event2}, nil)
 
-	// 测试用例
+	// Test cases
 	tests := []struct {
 		name           string
 		filter         nostr.Filter
@@ -217,7 +217,7 @@ func TestQueryEventsWithTimestampFilter(t *testing.T) {
 		expectedEvents []string
 	}{
 		{
-			name: "查询所有事件",
+			name: "Query all events",
 			filter: nostr.Filter{
 				Limit: 10,
 			},
@@ -225,10 +225,10 @@ func TestQueryEventsWithTimestampFilter(t *testing.T) {
 			expectedEvents: []string{"event1", "event2"},
 		},
 		{
-			name: "使用 since 过滤",
+			name: "Filter with since",
 			filter: nostr.Filter{
 				Since: func() *nostr.Timestamp {
-					t := nostr.Timestamp(now - 1800) // 30分钟前
+					t := nostr.Timestamp(now - 1800) // 30 minutes ago
 					return &t
 				}(),
 				Limit: 10,
@@ -237,10 +237,10 @@ func TestQueryEventsWithTimestampFilter(t *testing.T) {
 			expectedEvents: []string{"event2"},
 		},
 		{
-			name: "使用 until 过滤",
+			name: "Filter with until",
 			filter: nostr.Filter{
 				Until: func() *nostr.Timestamp {
-					t := nostr.Timestamp(now - 1800) // 30分钟前
+					t := nostr.Timestamp(now - 1800) // 30 minutes ago
 					return &t
 				}(),
 				Limit: 10,
@@ -249,14 +249,14 @@ func TestQueryEventsWithTimestampFilter(t *testing.T) {
 			expectedEvents: []string{"event1"},
 		},
 		{
-			name: "使用 since 和 until 过滤",
+			name: "Filter with since and until",
 			filter: nostr.Filter{
 				Since: func() *nostr.Timestamp {
-					t := nostr.Timestamp(now - 7200) // 2小时前
+					t := nostr.Timestamp(now - 7200) // 2 hours ago
 					return &t
 				}(),
 				Until: func() *nostr.Timestamp {
-					t := nostr.Timestamp(now - 1800) // 30分钟前
+					t := nostr.Timestamp(now - 1800) // 30 minutes ago
 					return &t
 				}(),
 				Limit: 10,
@@ -268,20 +268,20 @@ func TestQueryEventsWithTimestampFilter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// 执行查询
+			// Execute query
 			eventChan, err := adapter.QueryEvents(context.Background(), tt.filter)
 			assert.NoError(t, err)
 
-			// 收集事件
+			// Collect events
 			var events []*nostr.Event
 			for event := range eventChan {
 				events = append(events, event)
 			}
 
-			// 验证结果
+			// Verify results
 			assert.Equal(t, tt.expectedCount, len(events))
 
-			// 验证事件ID
+			// Verify event IDs
 			eventIDs := make([]string, len(events))
 			for i, event := range events {
 				eventIDs[i] = event.ID
@@ -291,43 +291,43 @@ func TestQueryEventsWithTimestampFilter(t *testing.T) {
 	}
 }
 
-// 测试保存事件
+// Test saving event
 func TestSaveEvent(t *testing.T) {
 	mockDB := new(MockDocumentStore)
 	adapter := NewOrbitDBAdapter(mockDB)
 
-	// 创建测试事件
+	// Create test event
 	event := &nostr.Event{
 		ID:        "test-event",
 		CreatedAt: nostr.Now(),
 		Content:   "test content",
 	}
 
-	// 设置模拟行为
+	// Set up mock behavior
 	mockDB.On("Put", mock.Anything, mock.Anything).Return("test-event", nil)
 
-	// 执行保存
+	// Execute saving
 	err := adapter.SaveEvent(context.Background(), event)
 	assert.NoError(t, err)
 	mockDB.AssertExpectations(t)
 }
 
-// 测试删除事件
+// Test deleting event
 func TestDeleteEvent(t *testing.T) {
 	mockDB := new(MockDocumentStore)
 	adapter := NewOrbitDBAdapter(mockDB)
 
-	// 创建测试事件
+	// Create test event
 	event := &nostr.Event{
 		ID:        "test-event",
 		CreatedAt: nostr.Now(),
 		Content:   "test content",
 	}
 
-	// 设置模拟行为
+	// Set up mock behavior
 	mockDB.On("Delete", mock.Anything, "test-event").Return("test-event", nil)
 
-	// 执行删除
+	// Execute deleting
 	err := adapter.DeleteEvent(context.Background(), event)
 	assert.NoError(t, err)
 	mockDB.AssertExpectations(t)

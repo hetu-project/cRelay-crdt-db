@@ -12,31 +12,33 @@ import (
 	"github.com/hetu-project/cRelay-crdt-db/internal/storage"
 )
 
+// EventHandlers handles event-related API requests
 type EventHandlers struct {
 	store storage.Store
 }
 
+// NewEventHandlers creates a new EventHandlers
 func NewEventHandlers(store storage.Store) *EventHandlers {
 	return &EventHandlers{store: store}
 }
 
-// SaveEvent 处理创建事件的请求
+// SaveEvent handles event creation requests
 func (h *EventHandlers) SaveEvent(w http.ResponseWriter, r *http.Request) {
 	var event nostr.Event
 	if err := json.NewDecoder(r.Body).Decode(&event); err != nil {
-		http.Error(w, "无效的请求体", http.StatusBadRequest)
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
 	if err := h.store.SaveEvent(r.Context(), &event); err != nil {
-		http.Error(w, "保存事件失败", http.StatusInternalServerError)
+		http.Error(w, "Failed to save event", http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusCreated)
 }
 
-// GetEvent 处理获取单个事件的请求
+// GetEvent handles requests to get a single event
 func (h *EventHandlers) GetEvent(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	eventID := vars["id"]
@@ -48,7 +50,7 @@ func (h *EventHandlers) GetEvent(w http.ResponseWriter, r *http.Request) {
 	events := make([]*nostr.Event, 0)
 	eventChan, err := h.store.QueryEvents(r.Context(), filter)
 	if err != nil {
-		http.Error(w, "查询事件失败", http.StatusInternalServerError)
+		http.Error(w, "Failed to query event", http.StatusInternalServerError)
 		return
 	}
 
@@ -57,59 +59,26 @@ func (h *EventHandlers) GetEvent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(events) == 0 {
-		http.Error(w, "事件未找到", http.StatusNotFound)
+		http.Error(w, "Event not found", http.StatusNotFound)
 		return
 	}
 
 	json.NewEncoder(w).Encode(events[0])
 }
 
-// QueryEvents 处理查询多个事件的请求
-// func (h *EventHandlers) QueryEvents(w http.ResponseWriter, r *http.Request) {
-// 	var filter nostr.Filter
-// 	if err := json.NewDecoder(r.Body).Decode(&filter); err != nil {
-// 		http.Error(w, "无效的过滤器", http.StatusBadRequest)
-// 		return
-// 	}
-
-// 	limit := 100 // 默认限制
-// 	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
-// 		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
-// 			limit = l
-// 		}
-// 	}
-
-// 	events := make([]*nostr.Event, 0)
-// 	eventChan, err := h.store.QueryEvents(r.Context(), filter)
-// 	if err != nil {
-// 		http.Error(w, "查询事件失败", http.StatusInternalServerError)
-// 		return
-// 	}
-
-// 	count := 0
-// 	for event := range eventChan {
-// 		if count >= limit {
-// 			break
-// 		}
-// 		events = append(events, event)
-// 		count++
-// 	}
-
-// 	json.NewEncoder(w).Encode(events)
-// }
-
+// QueryEvents handles requests to query multiple events
 func (h *EventHandlers) QueryEvents(w http.ResponseWriter, r *http.Request) {
-	// 使用通用map解析请求，以支持更灵活的过滤条件
+	// Use generic map to parse request for more flexible filtering conditions
 	var queryParams map[string]interface{}
 	if err := json.NewDecoder(r.Body).Decode(&queryParams); err != nil {
-		http.Error(w, "无效的过滤器格式", http.StatusBadRequest)
+		http.Error(w, "Invalid filter format", http.StatusBadRequest)
 		return
 	}
 
-	// 构建标准 nostr 过滤器
+	// Build standard nostr filter
 	filter := nostr.Filter{}
 
-	// 处理标准过滤字段
+	// Handle standard filter fields
 	if ids, ok := queryParams["ids"].([]interface{}); ok {
 		for _, id := range ids {
 			if idStr, ok := id.(string); ok {
@@ -138,7 +107,7 @@ func (h *EventHandlers) QueryEvents(w http.ResponseWriter, r *http.Request) {
 		filter.Limit = int(limit)
 	}
 
-	// 处理时间过滤
+	// Handle time filtering
 	if since, ok := queryParams["since"].(float64); ok {
 		timestamp := nostr.Timestamp(since)
 		filter.Since = &timestamp
@@ -148,10 +117,10 @@ func (h *EventHandlers) QueryEvents(w http.ResponseWriter, r *http.Request) {
 		filter.Until = &timestamp
 	}
 
-	// 特殊处理自定义标签过滤
+	// Special handling for custom tag filtering
 	filter.Tags = make(nostr.TagMap)
 
-	// 处理 sid 标签
+	// Handle sid tag
 	if sid, ok := queryParams["sid"].([]interface{}); ok && len(sid) > 0 {
 		sidValues := make([]string, 0)
 		for _, s := range sid {
@@ -162,7 +131,7 @@ func (h *EventHandlers) QueryEvents(w http.ResponseWriter, r *http.Request) {
 		filter.Tags["sid"] = sidValues
 	}
 
-	// 处理parent标签
+	// Handle parent tag
 	if parent, ok := queryParams["parent"].([]interface{}); ok && len(parent) > 0 {
 		parentValues := make([]string, 0)
 		for _, s := range parent {
@@ -173,7 +142,7 @@ func (h *EventHandlers) QueryEvents(w http.ResponseWriter, r *http.Request) {
 		filter.Tags["parent"] = parentValues
 	}
 
-	limit := 100 // 默认限制
+	limit := 100 // Default limit
 	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
 		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
 			limit = l
@@ -186,7 +155,7 @@ func (h *EventHandlers) QueryEvents(w http.ResponseWriter, r *http.Request) {
 	events := make([]*nostr.Event, 0)
 	eventChan, err := h.store.QueryEvents(r.Context(), filter)
 	if err != nil {
-		http.Error(w, "查询事件失败", http.StatusInternalServerError)
+		http.Error(w, "Failed to query events", http.StatusInternalServerError)
 		return
 	}
 
@@ -203,7 +172,7 @@ func (h *EventHandlers) QueryEvents(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(events)
 }
 
-// DeleteEvent 处理删除事件的请求
+// DeleteEvent handles event deletion requests
 func (h *EventHandlers) DeleteEvent(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	eventID := vars["id"]
@@ -215,7 +184,7 @@ func (h *EventHandlers) DeleteEvent(w http.ResponseWriter, r *http.Request) {
 	events := make([]*nostr.Event, 0)
 	eventChan, err := h.store.QueryEvents(r.Context(), filter)
 	if err != nil {
-		http.Error(w, "查询事件失败", http.StatusInternalServerError)
+		http.Error(w, "Failed to query event", http.StatusInternalServerError)
 		return
 	}
 
@@ -224,12 +193,12 @@ func (h *EventHandlers) DeleteEvent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(events) == 0 {
-		http.Error(w, "事件未找到", http.StatusNotFound)
+		http.Error(w, "Event not found", http.StatusNotFound)
 		return
 	}
 
 	if err := h.store.DeleteEvent(r.Context(), events[0]); err != nil {
-		http.Error(w, "删除事件失败", http.StatusInternalServerError)
+		http.Error(w, "Failed to delete event", http.StatusInternalServerError)
 		return
 	}
 

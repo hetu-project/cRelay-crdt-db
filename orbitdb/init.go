@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
 	"sync"
 
 	orbitdb "berty.tech/go-orbit-db"
@@ -23,35 +22,26 @@ var (
 	documentDB  iface.DocumentStore
 	initOnce    sync.Once
 	initialized bool
+	dbName      string
+	orbitDBDir  string
 )
 
-// Init 初始化数据库连接
-func Init() error {
+// Init initializes the database connection
+func Init(name string, orbitdir string) error {
+	dbName = name
+	orbitDBDir = orbitdir
 	var initErr error
 
 	initOnce.Do(func() {
-		// 获取数据目录
-		home, err := os.UserHomeDir()
-		if err != nil {
-			initErr = fmt.Errorf("无法获取用户主目录: %w", err)
+
+		if err := os.MkdirAll(orbitDBDir, 0755); err != nil {
+			initErr = fmt.Errorf("failed to create directory %s: %w", orbitDBDir, err)
 			return
 		}
 
-		dataDir := filepath.Join(home, "data")
-		ipfsDir := filepath.Join(dataDir, "ipfs")
-		orbitDBDir := filepath.Join(dataDir, "orbitdb")
-
-		// 创建必要的目录
-		for _, dir := range []string{dataDir, ipfsDir, orbitDBDir} {
-			if err := os.MkdirAll(dir, 0755); err != nil {
-				initErr = fmt.Errorf("创建目录失败 %s: %w", dir, err)
-				return
-			}
-		}
-
-		// 初始化 IPFS 节点
+		// Initialize IPFS node
 		ctx := context.Background()
-		ipfsNode, err = ipfsCore.NewNode(ctx, &ipfsCore.BuildCfg{
+		ipfsNode, err := ipfsCore.NewNode(ctx, &ipfsCore.BuildCfg{
 			Online: true,
 			// NilRepo: false,
 			ExtraOpts: map[string]bool{
@@ -60,42 +50,41 @@ func Init() error {
 			},
 		})
 		if err != nil {
-			initErr = fmt.Errorf("初始化 IPFS 节点失败: %w", err)
+			initErr = fmt.Errorf("failed to initialize IPFS node: %w", err)
 			return
 		}
 
 		// errs := ipfsNode.DHT.Provide(ctx, cid.Undef, true)
 		// if errs != nil {
-		// 	log.Printf("DHT 广告失败: %v", errs)
+		// 	log.Printf("DHT advertisement failed: %v", errs)
 		// }
-		// Relay 服务代码
+		// Relay service code
 		peerID := ipfsNode.Identity.String()
 		addrs := ipfsNode.PeerHost.Addrs()
-		log.Printf("Relay IPFS 节点信息:")
+		log.Printf("Relay IPFS node information:")
 		log.Printf("Peer ID: %s", peerID)
 		for _, addr := range addrs {
 			log.Printf("Multiaddr: %s/p2p/%s", addr.String(), peerID)
 		}
 
-		// 获取 IPFS API
+		// Get IPFS API
 		api, err := coreapi.NewCoreAPI(ipfsNode)
 		if err != nil {
-			initErr = fmt.Errorf("创建 IPFS API 失败: %w", err)
+			initErr = fmt.Errorf("failed to create IPFS API: %w", err)
 			return
 		}
 
-		// 创建 OrbitDB 实例
+		// Create OrbitDB instance
 		orbitDB, err = orbitdb.NewOrbitDB(ctx, api, &orbitdb.NewOrbitDBOptions{
 			Directory: &orbitDBDir,
 		})
 		if err != nil {
-			initErr = fmt.Errorf("创建 OrbitDB 实例失败: %w", err)
+			initErr = fmt.Errorf("failed to create OrbitDB instance: %w", err)
 			return
 		}
 
-		// 创建文档数据库
+		// Create document database
 		create := true
-		dbName := "nostr-events"
 		dbOptions := &orbitdb.CreateDBOptions{
 			AccessController: &accesscontroller.CreateAccessControllerOptions{
 				Type: "ipfs",
@@ -110,29 +99,29 @@ func Init() error {
 
 		db, err := orbitDB.Docs(ctx, dbName, dbOptions)
 		if err != nil {
-			initErr = fmt.Errorf("创建文档数据库失败: %w", err)
+			initErr = fmt.Errorf("failed to create document database: %w", err)
 			return
 		}
 		documentDB = db
 
 		initialized = true
 		addr := documentDB.Address().String()
-		log.Printf("文档数据库地址: %s", addr)
-		log.Println("数据库初始化成功")
+		log.Printf("Document database address: %s", addr)
+		log.Println("Database initialization successful")
 	})
 
 	return initErr
 }
 
-// GetStore 获取已初始化的 OrbitDB 存储实例
+// GetStore gets the initialized OrbitDB store instance
 func GetStore() (iface.DocumentStore, error) {
 	if !initialized || documentDB == nil {
-		return nil, fmt.Errorf("数据库未初始化")
+		return nil, fmt.Errorf("database not initialized")
 	}
 	return documentDB, nil
 }
 
-// Close 关闭数据库连接
+// Close closes the database connection
 func Close() error {
 	if documentDB != nil {
 		documentDB.Close()
@@ -144,7 +133,7 @@ func Close() error {
 
 	if ipfsNode != nil {
 		if err := ipfsNode.Close(); err != nil {
-			return fmt.Errorf("关闭 IPFS 节点失败: %w", err)
+			return fmt.Errorf("failed to close IPFS node: %w", err)
 		}
 	}
 

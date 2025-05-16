@@ -1,73 +1,162 @@
 #!/bin/bash
-
 set -e
 
-# 设置默认数据目录
-DATA_DIR="./data/node1"
-IPFS_DIR="$DATA_DIR/ipfs"
-ORBITDB_DIR="$DATA_DIR/orbitdb"
-SETTINGS_DIR="$DATA_DIR/settings"
-LISTEN_ADDR="/ip4/0.0.0.0/tcp/4001"
-IPFS_API_PORT=5001
+# Configuration section
+DEFAULT_DATA_DIR="$HOME/data"
+DEFAULT_API_DATA_DIR="$HOME/api-data"
+IPFS_DIR="${1:-$DEFAULT_DATA_DIR/ipfs}"
+NAK_LOG="$DEFAULT_DATA_DIR/nak.log"
+ORBITABI_LOG="$DEFAULT_DATA_DIR/orbitabi.log"
+TIMEOUT=60  # Timeout for waiting log output (seconds)
 
-# 可选：可通过参数自定义数据目录
-if [ -n "$1" ]; then
-  DATA_DIR="$1"
-  IPFS_DIR="$DATA_DIR/ipfs"
-  ORBITDB_DIR="$DATA_DIR/orbitdb"
-  SETTINGS_DIR="$DATA_DIR/settings"
-fi
+# Function to clean previous data
+clean_previous_data() {
+    echo "🧹 Cleaning previous data..."
+    
+    # Delete log files
+    rm -f "$NAK_LOG" "$ORBITABI_LOG" 2>/dev/null
+    
+    # Delete database directories
+    rm -rf \
+        "$DEFAULT_DATA_DIR/orbitdb" \
+        "$DEFAULT_API_DATA_DIR/orbitdb" \
+        "$IPFS_DIR" 2>/dev/null
+    
+    # Recreate base directories
+    mkdir -p "$DEFAULT_DATA_DIR" "$DEFAULT_API_DATA_DIR"
+}
 
-# 检查 IPFS 锁文件并清理
-LOCK_FILE="$IPFS_DIR/repo.lock"
-API_LOCK_FILE="$IPFS_DIR/api"
+# 1. Check and install IPFS
+install_ipfs() {
+    if ! command -v ipfs &> /dev/null; then
+        echo "❌ IPFS not installed, starting installation..."
+        
+        # Install dependencies
+        sudo apt-get update
+        sudo apt-get install -y wget
+        
+        # Download specific version
+        wget https://dist.ipfs.tech/kubo/v0.34.1/kubo_v0.34.1_linux-amd64.tar.gz
+        tar -xvzf kubo_v0.34.1_linux-amd64.tar.gz
+        sudo ./kubo/install.sh
+        rm -rf kubo*
+        
+        # Verify installation
+        if ! command -v ipfs &> /dev/null; then
+            echo "⚠️ IPFS installation failed, please install manually"
+            exit 1
+        fi
+        echo "✅ IPFS installation successful"
+    fi
+}
 
-if [ -f "$LOCK_FILE" ]; then
-  echo "==> 检测到锁文件，清理中..."
-  rm -f "$LOCK_FILE"
-  echo "==> 已删除 $LOCK_FILE"
-fi
+# 2. Check and install nak
+install_nak() {
+    if ! command -v nak &> /dev/null; then
+        echo "❌ nak not installed, starting installation..."
+        
+        # Clone repository
+        git clone https://github.com/hetu-project/cRelay-nak.git
+        cd cRelay-nak
+        
+        # Build and install
+        go build -o nak ./cmd/nak
+        sudo mv nak /usr/local/bin/
+        
+        # Verify installation
+        if ! command -v nak &> /dev/null; then
+            echo "⚠️ nak installation failed, please install manually"
+            exit 1
+        fi
+        echo "✅ nak installation successful"
+        cd ..
+    fi
+}
 
-if [ -f "$API_LOCK_FILE" ]; then
-  echo "==> 检测到 API 锁文件，清理中..."
-  rm -f "$API_LOCK_FILE"
-  echo "==> 已删除 $API_LOCK_FILE"
-fi
+# 3. Clean IPFS lock files
+clean_ipfs_locks() {
+    LOCK_FILES=("$IPFS_DIR/repo.lock" "$IPFS_DIR/api")
+    for lock in "${LOCK_FILES[@]}"; do
+        if [ -f "$lock" ]; then
+            echo "🔓 Cleaning lock file: $lock"
+            rm -f "$lock"
+        fi
+    done
+}
 
-# 1. 初始化 IPFS
-if [ ! -d "$IPFS_DIR" ] || [ ! -f "$IPFS_DIR/config" ]; then
-  echo "==> 初始化 IPFS 仓库 ($IPFS_DIR)..."
-  mkdir -p "$IPFS_DIR"
-  
-  # 使用环境变量设置 IPFS_PATH 来指定仓库路径
-  export IPFS_PATH="$IPFS_DIR"
-  ipfs init --profile server
-  
-  # 显式修改 config（开 pubsub 模式，增强互联）
-  ipfs config --json Pubsub.Enabled true
-  ipfs config --json Pubsub.Router '"gossipsub"'
-fi
+# 4. Initialize IPFS repository
+init_ipfs() {
+    if [ ! -d "$IPFS_DIR/config" ]; then
+        echo "🔄 Initializing IPFS repository ($IPFS_DIR)..."
+        # Note: Set IPFS_PATH before initialization
+        export IPFS_PATH="$IPFS_DIR"
+        ipfs init --profile server -e
+    else
+        # Still need to set environment variable for existing repository
+        export IPFS_PATH="$IPFS_DIR"
+    fi
+}
 
-# 2. 启动 IPFS daemon（后台运行，pubsub enabled）
-echo "==> 启动 IPFS daemon..."
-IPFS_PATH="$IPFS_DIR" ipfs daemon --enable-pubsub-experiment --api /ip4/127.0.0.1/tcp/$IPFS_API_PORT > ipfs_node1.log 2>&1 &
-IPFS_PID=$!
+# 5. Start nak service and extract key information
+start_nak() {
+    echo "🚀 Starting nak service..."
+    export IPFS_PATH="$IPFS_DIR"
+    nohup nak serve --hostname 0.0.0.0 > "$NAK_LOG" 2>&1 &
+    
+    # Wait and extract key information
+    echo "⏳ Waiting for nak service initialization..."
+    local start_time=$(date +%s)
+    
+    while true; do
+        # Get first Multiaddr
+        MULTIADDR=$(grep -m1 'Multiaddr: ' "$NAK_LOG" | awk '{print $2}')
+        DB_ADDRESS=$(grep -m1 'Document database address: ' "$NAK_LOG" | awk '{print $2}')
+        
+        # Check timeout
+        if [ $(($(date +%s) - start_time)) -gt $TIMEOUT ]; then
+            echo "⏰ Wait timeout, please check logs: $NAK_LOG"
+            exit 1
+        fi
+        
+        # Verify obtained information
+        if [[ -n "$MULTIADDR" && -n "$DB_ADDRESS" ]]; then
+            echo "✅ Key parameters obtained:"
+            echo "   Multiaddr: $MULTIADDR"
+            echo "   Database address: $DB_ADDRESS"
+            break
+        fi
+        sleep 1
+    done
+}
 
-# 等待 API 启动
-echo "==> 等待 IPFS API 启动..."
-for i in {1..15}
-do
-  if curl -s http://127.0.0.1:$IPFS_API_PORT/api/v0/version > /dev/null; then
-    echo "IPFS API 已启动"
-    break
-  fi
-  sleep 1
-done
+# 6. Start orbitabi service
+start_orbitabi() {
+    echo "🚀 Starting cRelay-crdt-db service..."
+    nohup cRelay-crdt-db -db "$DB_ADDRESS" -Multiaddr "$MULTIADDR" > "$ORBITABI_LOG" 2>&1 &
+    
+    # Verify startup
+    sleep 3
+    if ! pgrep -f "cRelay-crdt-db" > /dev/null; then
+        echo "⚠️ cRelay-crdt-db startup failed, please check logs: $ORBITABI_LOG"
+        exit 1
+    fi
+    
+    echo "✅ Service startup completed"
+    echo "========================"
+    echo "nak logs: $NAK_LOG"
+    echo "cRelay-crdt-db logs: $ORBITABI_LOG"
+    echo "IPFS directory: $IPFS_DIR"
+}
 
-# 3. 启动 OrbitDB 节点
-echo "==> 启动 OrbitDB 节点..."
-./orbitdb -data "$DATA_DIR" -listen "$LISTEN_ADDR" -ipfs "127.0.0.1:$IPFS_API_PORT"
-# ./orbitdb -data ./data/node1 -listen /ip4/0.0.0.0/tcp/4001 -ipfs "127.0.0.1:5001"
-# 4. 退出时关闭 IPFS
-echo "==> 正在退出，关闭 IPFS daemon..."
-kill $IPFS_PID
+# Main execution flow
+main() {
+    install_ipfs
+    install_nak
+    clean_ipfs_locks
+    init_ipfs
+    start_nak
+    start_orbitabi
+}
+
+# Execute main function
+main

@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-// MockStore 是一个模拟的存储接口实现
+// MockStore is a mock implementation of the storage interface
 type MockStore struct {
 	mock.Mock
 }
@@ -91,26 +91,26 @@ func (m *MockStore) UpdateFromEvent(ctx context.Context, event *nostr.Event) err
 	return args.Error(0)
 }
 
-// 测试 QueryEvents 的时间戳过滤功能
+// Test timestamp filtering functionality of QueryEvents
 func TestQueryEventsWithTimestampFilter(t *testing.T) {
-	// 创建模拟存储
+	// Create mock store
 	mockStore := new(MockStore)
 	handler := NewEventHandlers(mockStore)
 
-	// 创建测试事件
+	// Create test events
 	now := time.Now().Unix()
 	event1 := &nostr.Event{
 		ID:        "event1",
-		CreatedAt: nostr.Timestamp(now - 3600), // 1小时前
+		CreatedAt: nostr.Timestamp(now - 3600), // 1 hour ago
 		Content:   "test event 1",
 	}
 	event2 := &nostr.Event{
 		ID:        "event2",
-		CreatedAt: nostr.Timestamp(now), // 现在
+		CreatedAt: nostr.Timestamp(now), // now
 		Content:   "test event 2",
 	}
 
-	// 设置模拟行为
+	// Set up mock behavior
 	eventChan := make(chan *nostr.Event, 2)
 	eventChan <- event1
 	eventChan <- event2
@@ -118,7 +118,7 @@ func TestQueryEventsWithTimestampFilter(t *testing.T) {
 
 	mockStore.On("QueryEvents", mock.Anything, mock.Anything).Return(eventChan, nil)
 
-	// 测试用例
+	// Test cases
 	tests := []struct {
 		name           string
 		queryParams    map[string]interface{}
@@ -126,7 +126,7 @@ func TestQueryEventsWithTimestampFilter(t *testing.T) {
 		expectedEvents []string
 	}{
 		{
-			name: "查询所有事件",
+			name: "Query all events",
 			queryParams: map[string]interface{}{
 				"limit": 10,
 			},
@@ -134,28 +134,28 @@ func TestQueryEventsWithTimestampFilter(t *testing.T) {
 			expectedEvents: []string{"event1", "event2"},
 		},
 		{
-			name: "使用 since 过滤",
+			name: "Filter with since",
 			queryParams: map[string]interface{}{
-				"since": float64(now - 1800), // 30分钟前
+				"since": float64(now - 1800), // 30 minutes ago
 				"limit": 10,
 			},
 			expectedCount:  1,
 			expectedEvents: []string{"event2"},
 		},
 		{
-			name: "使用 until 过滤",
+			name: "Filter with until",
 			queryParams: map[string]interface{}{
-				"until": float64(now - 1800), // 30分钟前
+				"until": float64(now - 1800), // 30 minutes ago
 				"limit": 10,
 			},
 			expectedCount:  1,
 			expectedEvents: []string{"event1"},
 		},
 		{
-			name: "使用 since 和 until 过滤",
+			name: "Filter with both since and until",
 			queryParams: map[string]interface{}{
-				"since": float64(now - 7200), // 2小时前
-				"until": float64(now - 1800), // 30分钟前
+				"since": float64(now - 7200), // 2 hours ago
+				"until": float64(now - 1800), // 30 minutes ago
 				"limit": 10,
 			},
 			expectedCount:  1,
@@ -165,15 +165,15 @@ func TestQueryEventsWithTimestampFilter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// 创建请求
+			// Create request
 			body, _ := json.Marshal(tt.queryParams)
 			req := httptest.NewRequest("POST", "/events/query", bytes.NewBuffer(body))
 			w := httptest.NewRecorder()
 
-			// 执行请求
+			// Execute request
 			handler.QueryEvents(w, req)
 
-			// 验证响应
+			// Verify response
 			assert.Equal(t, http.StatusOK, w.Code)
 
 			var events []*nostr.Event
@@ -181,7 +181,7 @@ func TestQueryEventsWithTimestampFilter(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, tt.expectedCount, len(events))
 
-			// 验证事件ID
+			// Verify event IDs
 			eventIDs := make([]string, len(events))
 			for i, event := range events {
 				eventIDs[i] = event.ID
@@ -191,47 +191,47 @@ func TestQueryEventsWithTimestampFilter(t *testing.T) {
 	}
 }
 
-// 测试保存事件
+// Test saving events
 func TestSaveEvent(t *testing.T) {
 	mockStore := new(MockStore)
 	handler := NewEventHandlers(mockStore)
 
-	// 创建测试事件
+	// Create test event
 	event := &nostr.Event{
 		ID:        "test-event",
 		CreatedAt: nostr.Now(),
 		Content:   "test content",
 	}
 
-	// 设置模拟行为
+	// Set up mock behavior
 	mockStore.On("SaveEvent", mock.Anything, mock.Anything).Return(nil)
 
-	// 创建请求
+	// Create request
 	body, _ := json.Marshal(event)
 	req := httptest.NewRequest("POST", "/events", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 
-	// 执行请求
+	// Execute request
 	handler.SaveEvent(w, req)
 
-	// 验证响应
+	// Verify response
 	assert.Equal(t, http.StatusCreated, w.Code)
 	mockStore.AssertExpectations(t)
 }
 
-// 测试获取单个事件
+// Test getting a single event
 func TestGetEvent(t *testing.T) {
 	mockStore := new(MockStore)
 	handler := NewEventHandlers(mockStore)
 
-	// 创建测试事件
+	// Create test event
 	event := &nostr.Event{
 		ID:        "test-event",
 		CreatedAt: nostr.Now(),
 		Content:   "test content",
 	}
 
-	// 设置模拟行为
+	// Set up mock behavior
 	eventChan := make(chan *nostr.Event, 1)
 	eventChan <- event
 	close(eventChan)
@@ -239,16 +239,16 @@ func TestGetEvent(t *testing.T) {
 		return len(filter.IDs) == 1 && filter.IDs[0] == "test-event"
 	})).Return(eventChan, nil)
 
-	// 创建请求
+	// Create request
 	req := httptest.NewRequest("GET", "/events/test-event", nil)
 	w := httptest.NewRecorder()
 
-	// 设置路由参数
+	// Set up route parameters
 	router := mux.NewRouter()
 	router.HandleFunc("/events/{id}", handler.GetEvent).Methods("GET")
 	router.ServeHTTP(w, req)
 
-	// 验证响应
+	// Verify response
 	assert.Equal(t, http.StatusOK, w.Code)
 	var responseEvent nostr.Event
 	err := json.NewDecoder(w.Body).Decode(&responseEvent)

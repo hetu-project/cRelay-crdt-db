@@ -40,13 +40,11 @@ import (
 )
 
 var (
-	dbAddress = flag.String("db", "", "OrbitDB address to connect to")
-	//relayPeerID    = flag.String("PeerID", "", "relayPeerID")
+	dbAddress      = flag.String("db", "", "OrbitDB address to connect to")
 	relayMultiaddr = flag.String("Multiaddr", "", "relayMultiaddr")
-	//dataDir    = flag.String("data", "~/data", "Data directory path")
-	// listenAddr = flag.String("listen", "/ip4/0.0.0.0/tcp/4001", "Libp2p listen address")
-	// ipfssAPI   = flag.String("ipfs", "localhost:5001", "IPFS API endpoint")
-	port      = flag.String("port", "8080", "API服务端口")
+	port           = flag.String("port", "8080", "API service port")
+	orbitDBDir     = flag.String("orbitdb-dir", "", "OrbitDB data storage directory")
+	// dbName        = flag.String("db-name", "", "Database name")
 	StoreType = "docstore" // eventlog|keyvalue|docstore
 	Create    = true
 )
@@ -57,96 +55,28 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// 获取数据目录
-	home, _ := os.UserHomeDir()
-
-	dataDir := filepath.Join(home, "api-data")
-	// Setup data directories
-	ipfsDir := filepath.Join(dataDir, "ipfs")
-	orbitDBDir := filepath.Join(dataDir, "orbitdb")
-	// settingsDir := filepath.Join(dataDir, "settings")
-	log.Printf("abi服务rbitdb数据库地址 %s", orbitDBDir)
+	if *orbitDBDir == "" {
+		home, _ := os.UserHomeDir()
+		*orbitDBDir = filepath.Join(home, "api-data", "orbitdb")
+	}
+	log.Printf("API service OrbitDB database address: %s", *orbitDBDir)
 	// Ensure directories exist
-	for _, dir := range []string{dataDir, ipfsDir, orbitDBDir} {
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			log.Fatalf("Failed to create directory %s: %v", dir, err)
-		}
+	if err := os.MkdirAll(*orbitDBDir, 0755); err != nil {
+		log.Fatalf("Failed to create directory %s: %v", *orbitDBDir, err)
 	}
 
-	// Get or generate peer identity
-	// privKey, peerID, err := getOrCreatePeerID(settingsDir)
-	// if err != nil {
-	// 	log.Fatalf("Failed to get peer ID: %v", err)
-	// }
-	// log.Printf("Using Peer ID: %s", peerID.String())
-
-	// Connect to local IPFS node
-	// ipfsAPI, ipfsNode, err := InitIPFS(ipfsDir)
-	// if err != nil {
-	// 	log.Fatalf("Failed to initialize IPFS: %v", err)
-	// }
-	// defer ipfsNode.Close()
 	node, _ := core.NewNode(ctx, &core.BuildCfg{
-		Online: true, // 必须为 true，OrbitDB 需要网络功能
-		// NilRepo: false, // 需要持久化存储
+		Online: true, // Must be true, OrbitDB requires network functionality
+		// NilRepo: false, // Requires persistent storage
 		ExtraOpts: map[string]bool{
-			"pubsub": true, // OrbitDB 依赖 PubSub
-			"mplex":  true, // 多路复用支持
+			"pubsub": true, // OrbitDB depends on PubSub
+			"mplex":  true, // Multiplexing support
 		},
 	})
 	api, _ := coreapi.NewCoreAPI(node)
-	// Initialize IPFS HTTP client
-	// sh := shell.NewShell(*ipfssAPI)
-	// if sh == nil {
-	// 	log.Fatalf("Failed to initialize IPFS HTTP client")
-	// }
-	// 2. 转换为 coreapi 接口
-	// api, err := coreapi.NewClient(sh)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// Setup libp2p host
-	// host, err := setupLibp2p(ctx, privKey, *listenAddr)
-	// if err != nil {
-	// 	log.Fatalf("Failed to create libp2p host: %v", err)
-	// }
-
-	// Print peer addresses
-	// addrs := host.Addrs()
-	// var addrStrings []string
-	// for _, addr := range addrs {
-	// 	addrStrings = append(addrStrings, fmt.Sprintf("%s/p2p/%s", addr.String(), host.ID().String()))
-	// }
-	// log.Printf("Peer addresses: %s", strings.Join(addrStrings, ", "))
-
-	// Create OrbitDB instance
-	// orbit, err := orbitdb.NewOrbitDB(ctx, ipfsAPI, &orbitdb.NewOrbitDBOptions{
-	// 	Directory: &orbitDBDir,
-	// })
-	// Explicitly try to enable pubsub
-	// Create OrbitDB instance with explicit pubsub options
-
-	//relayPeerID := "QmRelayPeerID" // 替换为实际值
-	// relayMultiaddr := "/ip4/127.0.0.1/tcp/4001/p2p/QmRelayPeerID" // 使用本地回环地址
-
-	// peerID, errs := peer.Decode(*relayPeerID)
-	// if errs != nil {
-	// 	fmt.Println("解码 Peer ID 失败:", errs)
-	// 	return
-	// }
-
-	// _, errs = node.DHT.FindPeer(ctx, peerID)
-	// if errs != nil {
-	// 	log.Printf("DHT 中未找到 Relay 节点: %v", errs)
-	// }
-
-	// err := api.Swarm().Connect(ctx, peer.AddrInfo{
-	// 	ID:    peer.ID(*relayPeerID),
-	// 	Addrs: []ma.Multiaddr{ma.StringCast(*relayMultiaddr)},
-	// })
 
 	orbit, err := orbitdb.NewOrbitDB(ctx, api, &orbitdb.NewOrbitDBOptions{
-		Directory: &orbitDBDir,
+		Directory: orbitDBDir,
 	})
 	if err != nil {
 		log.Fatalf("Failed to create OrbitDB instance: %v", err)
@@ -157,7 +87,7 @@ func main() {
 		// Connect to existing database
 		log.Printf("Connecting to database: %s", *dbAddress)
 		dbInstance, err := orbit.Open(ctx, *dbAddress, &orbitdb.CreateDBOptions{
-			Directory: &orbitDBDir,
+			Directory: orbitDBDir,
 			Create:    &Create,
 			StoreType: &StoreType,
 		})
@@ -168,38 +98,33 @@ func main() {
 		addrInfo, _ := peer.AddrInfoFromP2pAddr(addr)
 		err = api.Swarm().Connect(ctx, *addrInfo)
 		if err != nil {
-			log.Printf("连接 Relay 节点失败: %v", err)
+			log.Printf("Failed to connect to Relay node: %v", err)
 		} else {
-			log.Printf("成功连接到 Relay 节点")
+			log.Printf("Successfully connected to Relay node")
 		}
-		// peers, _ := api.Swarm().Peers(ctx)
-		// for _, p := range peers {
-		// 	log.Printf("已连接 Peer: %s", p.ID())
-		// }
 		defer orbit.Close()
 		db = dbInstance.(iface.DocumentStore)
 		newadd := db.Address().String()
-		log.Printf("API数据库地址 %s", newadd)
-		// 创建API路由器
+		log.Printf("API database address: %s", newadd)
+		// Create API router
 		router := router.NewRouter(adapter.NewOrbitDBAdapter(db))
 
-		// 启动HTTP服务器
+		// Start HTTP server
 		addrs := fmt.Sprintf(":%s", *port)
-		log.Printf("API服务启动在 %s", addrs)
+		log.Printf("API service starting on %s", addrs)
 		if err := http.ListenAndServe(addrs, router.Handler()); err != nil {
-			log.Fatalf("HTTP服务器错误: %v", err)
+			log.Fatalf("HTTP server error: %v", err)
 		}
 
 	} else {
 		log.Fatal(`
-                   错误：未指定数据库地址！
-                   请先启动 relay 服务生成数据库地址，再通过 -db 参数运行此 API 服务。
-                   示例命令：
+                   Error: Database address not specified!
+                   Please start the relay service first to generate a database address, then run this API service with the -db parameter.
+                   Example command:
                    ./api-service -db /orbitdb/zdpuAm... -port 8080
 		`)
 		//log.Printf("Database created with address: %s", db.Address().String())
 	}
-
 }
 
 // getOrCreatePeerID loads or creates a peer ID
@@ -278,7 +203,7 @@ func setupLibp2p(ctx context.Context, privKey crypto.PrivKey, listenAddr string)
 	return host, nil
 }
 
-// connectToExistingDB 连接 relay 创建的数据库
+// connectToExistingDB connects to the database created by relay
 func connectToExistingDB(ctx context.Context, api coreiface.CoreAPI, dbAddress string) (iface.OrbitDB, iface.DocumentStore, error) {
 	orbitInstance, err := orbitdb.NewOrbitDB(ctx, api, nil)
 	if err != nil {
@@ -287,7 +212,7 @@ func connectToExistingDB(ctx context.Context, api coreiface.CoreAPI, dbAddress s
 
 	db, err := orbitInstance.Open(ctx, dbAddress, nil)
 	if err != nil {
-		return nil, nil, fmt.Errorf("无法打开数据库：%w（请确认 relay 正在运行）", err)
+		return nil, nil, fmt.Errorf("failed to open database: %w (please ensure relay is running)", err)
 	}
 
 	return orbitInstance, db.(iface.DocumentStore), nil

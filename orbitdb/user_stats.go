@@ -11,74 +11,72 @@ import (
 	"github.com/nbd-wtf/go-nostr"
 )
 
-// UserStats 表示用户的统计数据
+// UserStats represents user statistics data
 type UserStats struct {
-	ID               string                       `json:"id"`                     // 用户ID，即用户的ETH地址
-	DocType          string                       `json:"doc_type"`               // 文档类型，固定为"user_stats"
-	TotalStats       map[uint32]uint64            `json:"total_stats"`            // 各种操作的总体统计
-	SubspaceStats    map[string]map[uint32]uint64 `json:"subspace_stats"`         // 各个子空间的统计
-	CreatedSubspaces []string                     `json:"created_subspaces"`      // 用户创建的子空间ID列表
-	JoinedSubspaces  []string                     `json:"joined_subspaces"`       // 用户加入的子空间ID列表
-	VoteStats        *VoteStats                   `json:"vote_stats,omitempty"`   // 投票统计
-	InviteStats      *InviteStats                 `json:"invite_stats,omitempty"` // 邀请统计
-	LastUpdated      int64                        `json:"last_updated"`           // 最后更新时间
+	ID               string                       `json:"id"`                     // User ID, which is the user's ETH address
+	DocType          string                       `json:"doc_type"`               // Document type, fixed as "user_stats"
+	TotalStats       map[uint32]uint64            `json:"total_stats"`            // Overall statistics for various operations
+	SubspaceStats    map[string]map[uint32]uint64 `json:"subspace_stats"`         // Statistics for each subspace
+	CreatedSubspaces []string                     `json:"created_subspaces"`      // List of subspace IDs created by the user
+	JoinedSubspaces  []string                     `json:"joined_subspaces"`       // List of subspace IDs joined by the user
+	VoteStats        *VoteStats                   `json:"vote_stats,omitempty"`   // Voting statistics
+	InviteStats      *InviteStats                 `json:"invite_stats,omitempty"` // Invitation statistics
+	LastUpdated      int64                        `json:"last_updated"`           // Last update time
 }
 
-// VoteStats 投票相关统计
+// VoteStats represents voting-related statistics
 type VoteStats struct {
-	TotalVotes    uint64                        `json:"total_votes"`    // 总投票数
-	YesVotes      uint64                        `json:"yes_votes"`      // 总赞成票
-	NoVotes       uint64                        `json:"no_votes"`       // 总反对票
-	SubspaceVotes map[string]*SubspaceVoteStats `json:"subspace_votes"` // 各子空间投票统计
+	TotalVotes    uint64                        `json:"total_votes"`    // Total number of votes
+	YesVotes      uint64                        `json:"yes_votes"`      // Total number of yes votes
+	NoVotes       uint64                        `json:"no_votes"`       // Total number of no votes
+	SubspaceVotes map[string]*SubspaceVoteStats `json:"subspace_votes"` // Voting statistics for each subspace
 }
 
-// SubspaceVoteStats 子空间投票统计
+// SubspaceVoteStats represents voting statistics for a subspace
 type SubspaceVoteStats struct {
-	TotalVotes uint64 `json:"total_votes"` // 子空间总投票数
-	YesVotes   uint64 `json:"yes_votes"`   // 子空间赞成票
-	NoVotes    uint64 `json:"no_votes"`    // 子空间反对票
+	TotalVotes uint64 `json:"total_votes"` // Total number of votes in the subspace
+	YesVotes   uint64 `json:"yes_votes"`   // Number of yes votes in the subspace
+	NoVotes    uint64 `json:"no_votes"`    // Number of no votes in the subspace
 }
 
-// InviteStats 邀请相关统计
+// InviteStats represents invitation-related statistics
 type InviteStats struct {
-	TotalInvited    uint64                        `json:"total_invited"`    // 总邀请成功数
-	SubspaceInvited map[string]uint64             `json:"subspace_invited"` // 各子空间邀请成功数
-	InvitedUsers    map[string][]*InvitedUserInfo `json:"invited_users"`    // 接受邀请的用户信息
+	TotalInvited    uint64                        `json:"total_invited"`    // Total number of successful invitations
+	SubspaceInvited map[string]uint64             `json:"subspace_invited"` // Number of successful invitations for each subspace
+	InvitedUsers    map[string][]*InvitedUserInfo `json:"invited_users"`    // Information about users who accepted invitations
 }
 
-// InvitedUserInfo 被邀请用户信息
+// InvitedUserInfo represents information about an invited user
 type InvitedUserInfo struct {
-	UserID     string `json:"user_id"`     // 被邀请用户地址
-	SubspaceID string `json:"subspace_id"` // 被邀请加入的子空间
-	Timestamp  int64  `json:"timestamp"`   // 邀请接受时间
+	UserID     string `json:"user_id"`     // Invited user's address
+	SubspaceID string `json:"subspace_id"` // Subspace the user was invited to join
+	Timestamp  int64  `json:"timestamp"`   // Time the invitation was accepted
 }
 
-// UserStatsManager 管理用户统计的结构体
+// UserStatsManager manages user statistics
 type UserStatsManager struct {
 	db iface.DocumentStore
 }
 
-// NewUserStatsManager 创建一个新的用户统计管理器
+// NewUserStatsManager creates a new UserStatsManager
 func NewUserStatsManager(db iface.DocumentStore) *UserStatsManager {
-	return &UserStatsManager{
-		db: db,
-	}
+	return &UserStatsManager{db: db}
 }
 
-// GetUserStats 获取用户统计数据
+// GetUserStats retrieves user statistics
 func (um *UserStatsManager) GetUserStats(ctx context.Context, userID string) (*UserStats, error) {
-	// 查询用户数据
+	// Query user data
 	docs, err := um.db.Get(ctx, userID, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	// 如果不存在，返回空值
+	// If not found, return nil
 	if len(docs) == 0 {
 		return nil, nil
 	}
 
-	// 遍历结果查找user_stats类型的文档
+	// Iterate through results to find user_stats type document
 	var userStatsDoc map[string]interface{}
 	for _, doc := range docs {
 		docMap, ok := doc.(map[string]interface{})
@@ -99,7 +97,7 @@ func (um *UserStatsManager) GetUserStats(ctx context.Context, userID string) (*U
 		return nil, nil
 	}
 
-	// 将文档转换为JSON再解析为结构体
+	// Convert document to JSON and parse into struct
 	jsonData, err := json.Marshal(userStatsDoc)
 	if err != nil {
 		return nil, err
@@ -113,20 +111,20 @@ func (um *UserStatsManager) GetUserStats(ctx context.Context, userID string) (*U
 	return &userStats, nil
 }
 
-// UpdateUserStatsFromEvent 从事件更新用户统计
+// UpdateUserStatsFromEvent updates user statistics from an event
 func (um *UserStatsManager) UpdateUserStatsFromEvent(ctx context.Context, event *nostr.Event) error {
 	if event == nil {
-		return fmt.Errorf("事件不能为空")
+		return fmt.Errorf("event cannot be nil")
 	}
 
-	// 获取用户的现有统计数据
+	// Get existing user statistics
 	userID := event.PubKey
 	stats, err := um.GetUserStats(ctx, userID)
 	if err != nil {
 		return err
 	}
 
-	// 如果不存在，创建新的统计数据
+	// If not found, create new statistics
 	now := time.Now().Unix()
 	if stats == nil {
 		stats = &UserStats{
@@ -140,16 +138,16 @@ func (um *UserStatsManager) UpdateUserStatsFromEvent(ctx context.Context, event 
 		}
 	}
 
-	// 更新最后更新时间
+	// Update last update time
 	stats.LastUpdated = now
 
-	// 根据事件类型更新统计
+	// Update statistics based on event type
 	kind := uint32(event.Kind)
 
-	// 递增总统计
+	// Increment total statistics
 	stats.TotalStats[kind] = stats.TotalStats[kind] + 1
 
-	// 查找事件中的子空间ID
+	// Find subspace ID in event
 	var subspaceID string
 	for _, tag := range event.Tags {
 		if len(tag) >= 2 && tag[0] == "sid" {
@@ -158,47 +156,47 @@ func (um *UserStatsManager) UpdateUserStatsFromEvent(ctx context.Context, event 
 		}
 	}
 
-	// 如果有子空间ID，更新子空间相关统计
+	// If subspace ID exists, update subspace-related statistics
 	if subspaceID != "" {
-		// 确保子空间统计存在
+		// Ensure subspace statistics exist
 		if _, exists := stats.SubspaceStats[subspaceID]; !exists {
 			stats.SubspaceStats[subspaceID] = make(map[uint32]uint64)
 		}
-		// 递增子空间统计
+		// Increment subspace statistics
 		stats.SubspaceStats[subspaceID][kind] = stats.SubspaceStats[subspaceID][kind] + 1
 
 		switch kind {
-		case 30100: // 创建子空间
-			// 将子空间添加到创建的子空间列表
+		case 30100: // Create subspace
+			// Add subspace to created subspaces list
 			if !containsString(stats.CreatedSubspaces, subspaceID) {
 				stats.CreatedSubspaces = append(stats.CreatedSubspaces, subspaceID)
 			}
 
-		case 30200: // 加入子空间
-			// 将子空间添加到加入的子空间列表
+		case 30200: // Join subspace
+			// Add subspace to joined subspaces list
 			if !containsString(stats.JoinedSubspaces, subspaceID) {
 				stats.JoinedSubspaces = append(stats.JoinedSubspaces, subspaceID)
 			}
 
-		case 30302: // 投票
-			// 初始化投票统计
+		case 30302: // Vote
+			// Initialize vote statistics
 			if stats.VoteStats == nil {
 				stats.VoteStats = &VoteStats{
 					SubspaceVotes: make(map[string]*SubspaceVoteStats),
 				}
 			}
 
-			// 确保子空间投票统计存在
+			// Ensure subspace vote statistics exist
 			if _, exists := stats.VoteStats.SubspaceVotes[subspaceID]; !exists {
 				stats.VoteStats.SubspaceVotes[subspaceID] = &SubspaceVoteStats{}
 			}
 
-			// 递增总投票数
+			// Increment total vote count
 			stats.VoteStats.TotalVotes++
-			// 递增子空间投票数
+			// Increment subspace vote count
 			stats.VoteStats.SubspaceVotes[subspaceID].TotalVotes++
 
-			// 检查投票类型（是/否）
+			// Check vote type (yes/no)
 			for _, tag := range event.Tags {
 				if len(tag) >= 2 && tag[0] == "vote" {
 					voteValue := tag[1]
@@ -213,8 +211,8 @@ func (um *UserStatsManager) UpdateUserStatsFromEvent(ctx context.Context, event 
 				}
 			}
 
-		case 30303: // 邀请
-			// 处理接受邀请的情况
+		case 30303: // Invite
+			// Handle invitation acceptance
 			var inviterAddr string
 			for _, tag := range event.Tags {
 				if len(tag) >= 2 && tag[0] == "inviter_addr" {
@@ -224,29 +222,29 @@ func (um *UserStatsManager) UpdateUserStatsFromEvent(ctx context.Context, event 
 			}
 
 			if inviterAddr != "" {
-				// 发起邀请的是其他用户，当前用户是受邀者
-				// 需要更新邀请者的统计
+				// The inviter is another user, the current user is the invitee
+				// Need to update inviter's statistics
 				err = um.updateInviterStats(ctx, inviterAddr, userID, subspaceID, now)
 				if err != nil {
-					log.Printf("更新邀请者统计失败: %v", err)
+					log.Printf("Failed to update inviter statistics: %v", err)
 				}
 			}
 		}
 	}
 
-	// 保存更新后的统计
+	// Save updated statistics
 	return um.saveUserStats(ctx, stats)
 }
 
-// 更新邀请者的邀请统计
+// Update inviter's invitation statistics
 func (um *UserStatsManager) updateInviterStats(ctx context.Context, inviterID, invitedID, subspaceID string, timestamp int64) error {
-	// 获取邀请者的统计
+	// Get inviter's statistics
 	inviterStats, err := um.GetUserStats(ctx, inviterID)
 	if err != nil {
 		return err
 	}
 
-	// 如果不存在，创建新的统计
+	// If not found, create new statistics
 	if inviterStats == nil {
 		inviterStats = &UserStats{
 			ID:            inviterID,
@@ -257,7 +255,7 @@ func (um *UserStatsManager) updateInviterStats(ctx context.Context, inviterID, i
 		}
 	}
 
-	// 初始化邀请统计
+	// Initialize invitation statistics
 	if inviterStats.InviteStats == nil {
 		inviterStats.InviteStats = &InviteStats{
 			SubspaceInvited: make(map[string]uint64),
@@ -265,28 +263,28 @@ func (um *UserStatsManager) updateInviterStats(ctx context.Context, inviterID, i
 		}
 	}
 
-	// 更新邀请统计
+	// Update invitation statistics
 	inviterStats.InviteStats.TotalInvited++
 	inviterStats.InviteStats.SubspaceInvited[subspaceID]++
 
-	// 添加被邀请用户信息
+	// Add invited user information
 	userInfo := &InvitedUserInfo{
 		UserID:     invitedID,
 		SubspaceID: subspaceID,
 		Timestamp:  timestamp,
 	}
 
-	// 追加到用户列表
+	// Append to user list
 	if _, exists := inviterStats.InviteStats.InvitedUsers[subspaceID]; !exists {
 		inviterStats.InviteStats.InvitedUsers[subspaceID] = []*InvitedUserInfo{}
 	}
 	inviterStats.InviteStats.InvitedUsers[subspaceID] = append(inviterStats.InviteStats.InvitedUsers[subspaceID], userInfo)
 
-	// 保存更新后的统计
+	// Save updated statistics
 	return um.saveUserStats(ctx, inviterStats)
 }
 
-// saveUserStats 保存用户统计数据
+// Save user statistics
 func (um *UserStatsManager) saveUserStats(ctx context.Context, stats *UserStats) error {
 	doc := map[string]interface{}{
 		"_id":               stats.ID,
@@ -311,7 +309,7 @@ func (um *UserStatsManager) saveUserStats(ctx context.Context, stats *UserStats)
 	return err
 }
 
-// QueryUsersBySubspace 查询特定子空间的所有用户
+// QueryUsersBySubspace queries all users in a specific subspace
 func (um *UserStatsManager) QueryUsersBySubspace(ctx context.Context, subspaceID string) ([]*UserStats, error) {
 	var results []*UserStats
 
@@ -321,18 +319,18 @@ func (um *UserStatsManager) QueryUsersBySubspace(ctx context.Context, subspaceID
 			return false, nil
 		}
 
-		// 检查是否是用户统计类型
+		// Check if it's a user statistics type
 		docType, ok := docMap["doc_type"].(string)
 		if !ok || docType != "user_stats" {
 			return false, nil
 		}
 
-		// 检查是否包含指定子空间
+		// Check if it contains the specified subspace
 		joinedSubspaces, ok := docMap["joined_subspaces"].([]interface{})
 		if ok {
 			for _, sid := range joinedSubspaces {
 				if sidStr, ok := sid.(string); ok && sidStr == subspaceID {
-					// 将文档转换为JSON
+					// Convert document to JSON
 					jsonData, err := json.Marshal(docMap)
 					if err != nil {
 						return false, nil
@@ -352,13 +350,13 @@ func (um *UserStatsManager) QueryUsersBySubspace(ctx context.Context, subspaceID
 		return false, nil
 	}
 
-	// 执行查询
+	// Execute query
 	um.db.Query(ctx, queryFn)
 
 	return results, nil
 }
 
-// QueryUserStats 根据条件查询用户统计
+// QueryUserStats queries user statistics based on conditions
 func (um *UserStatsManager) QueryUserStats(ctx context.Context, filter func(*UserStats) bool) ([]*UserStats, error) {
 	var results []*UserStats
 
@@ -368,13 +366,13 @@ func (um *UserStatsManager) QueryUserStats(ctx context.Context, filter func(*Use
 			return false, nil
 		}
 
-		// 检查是否是用户统计类型
+		// Check if it's a user statistics type
 		docType, ok := docMap["doc_type"].(string)
 		if !ok || docType != "user_stats" {
 			return false, nil
 		}
 
-		// 将文档转换为JSON
+		// Convert document to JSON
 		jsonData, err := json.Marshal(docMap)
 		if err != nil {
 			return false, nil
@@ -385,7 +383,7 @@ func (um *UserStatsManager) QueryUserStats(ctx context.Context, filter func(*Use
 			return false, nil
 		}
 
-		// 应用过滤器
+		// Apply filter
 		if filter == nil || filter(&userStats) {
 			results = append(results, &userStats)
 		}
@@ -393,13 +391,13 @@ func (um *UserStatsManager) QueryUserStats(ctx context.Context, filter func(*Use
 		return true, nil
 	}
 
-	// 执行查询
+	// Execute query
 	um.db.Query(ctx, queryFn)
 
 	return results, nil
 }
 
-// containsString 检查字符串数组是否包含特定字符串
+// Helper function: check if a slice contains a string
 func containsString(arr []string, str string) bool {
 	for _, s := range arr {
 		if s == str {

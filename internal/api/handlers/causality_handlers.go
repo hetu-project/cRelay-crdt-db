@@ -14,61 +14,61 @@ import (
 	"github.com/hetu-project/cRelay-crdt-db/orbitdb"
 )
 
-// CausalityHandlers 处理因果关系相关的HTTP请求
+// CausalityHandlers handles causality-related API requests
 type CausalityHandlers struct {
 	store storage.Store
 }
 
-// NewCausalityHandlers 创建因果关系处理程序
+// NewCausalityHandlers creates a new CausalityHandlers
 func NewCausalityHandlers(store storage.Store) *CausalityHandlers {
 	return &CausalityHandlers{
 		store: store,
 	}
 }
 
-// GetSubspaceCausality 处理获取子空间因果关系的请求
+// GetSubspaceCausality handles getting subspace causality requests
 func (h *CausalityHandlers) GetSubspaceCausality(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	subspaceID := vars["id"]
 
-	// 获取子空间的因果关系
+	// Get subspace causality
 	causality, err := h.store.GetSubspaceCausality(r.Context(), subspaceID)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("获取子空间因果关系失败: %v", err), http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("Failed to get subspace causality: %v", err), http.StatusInternalServerError)
 		return
 	}
 
 	if causality == nil {
-		http.Error(w, "子空间不存在", http.StatusNotFound)
+		http.Error(w, "Subspace does not exist", http.StatusNotFound)
 		return
 	}
 
-	// 返回JSON响应
+	// Return JSON response
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(causality)
 }
 
-// GetCausalityKey 处理获取特定因果关系键的请求
+// GetCausalityKey handles getting specific causality key requests
 func (h *CausalityHandlers) GetCausalityKey(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	subspaceID := vars["id"]
 	keyIDStr := vars["key"]
 
-	// 将键ID转换为uint32
+	// Convert key ID to uint32
 	keyID, err := strconv.ParseUint(keyIDStr, 10, 32)
 	if err != nil {
-		http.Error(w, "无效的键ID", http.StatusBadRequest)
+		http.Error(w, "Invalid key ID", http.StatusBadRequest)
 		return
 	}
 
-	// 获取因果关系键的计数器值
+	// Get causality key counter value
 	counter, err := h.store.GetCausalityKey(r.Context(), subspaceID, uint32(keyID))
 	if err != nil {
-		http.Error(w, fmt.Sprintf("获取因果关系键失败: %v", err), http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("Failed to get causality key: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	// 返回JSON响应
+	// Return JSON response
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"subspace_id": subspaceID,
@@ -77,47 +77,47 @@ func (h *CausalityHandlers) GetCausalityKey(w http.ResponseWriter, r *http.Reque
 	})
 }
 
-// GetSubspaceEvents 处理获取子空间事件的请求
+// GetSubspaceEvents handles getting subspace events requests
 func (h *CausalityHandlers) GetSubspaceEvents(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	subspaceID := vars["id"]
 
-	// 获取子空间事件ID列表
+	// Get subspace event ID list
 	eventIDs, err := h.store.GetCausalityEvents(r.Context(), subspaceID)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("获取子空间事件失败: %v", err), http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("Failed to get subspace events: %v", err), http.StatusInternalServerError)
 		return
 	}
 
 	if len(eventIDs) == 0 {
-		// 返回空数组
+		// Return empty array
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte("[]"))
 		return
 	}
 
-	// 创建过滤器查询这些事件
+	// Create filter to query these events
 	filter := nostr.Filter{
 		IDs: eventIDs,
 	}
 
-	// 限制返回的事件数量
-	limit := 100 // 默认限制
+	// Limit returned events
+	limit := 100 // Default limit
 	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
 		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
 			limit = l
 		}
 	}
 
-	// 查询事件
+	// Query events
 	events := make([]*nostr.Event, 0)
 	eventChan, err := h.store.QueryEvents(r.Context(), filter)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("查询事件失败: %v", err), http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("Failed to query events: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	// 收集事件
+	// Collect events
 	count := 0
 	for event := range eventChan {
 		if count >= limit {
@@ -127,19 +127,19 @@ func (h *CausalityHandlers) GetSubspaceEvents(w http.ResponseWriter, r *http.Req
 		count++
 	}
 
-	// 返回JSON响应
+	// Return JSON response
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(events)
 }
 
-// ListSubspaces 处理列出所有子空间的请求
+// ListSubspaces handles listing all subspaces requests
 func (h *CausalityHandlers) ListSubspaces(w http.ResponseWriter, r *http.Request) {
-	// 获取查询参数
+	// Get query parameters
 	query := r.URL.Query()
 	sinceStr := query.Get("since")
 	untilStr := query.Get("until")
 
-	// 解析时间范围
+	// Parse time range
 	var since, until *int64
 	if sinceStr != "" {
 		sinceVal, err := strconv.ParseInt(sinceStr, 10, 64)
@@ -155,7 +155,7 @@ func (h *CausalityHandlers) ListSubspaces(w http.ResponseWriter, r *http.Request
 		}
 	}
 
-	// 创建过滤器函数
+	// Create filter function
 	filter := func(c *orbitdb.SubspaceCausality) bool {
 		if since != nil && c.Updated < *since {
 			return false
@@ -166,21 +166,21 @@ func (h *CausalityHandlers) ListSubspaces(w http.ResponseWriter, r *http.Request
 		return true
 	}
 
-	// 查询子空间
+	// Query subspaces
 	subspaces, err := h.store.QuerySubspaces(r.Context(), filter)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("查询子空间失败: %v", err), http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("Failed to query subspaces: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	// 返回JSON响应
+	// Return JSON response
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(subspaces)
 }
 
-// CreateSubspaceEvent 创建一个子空间事件
+// CreateSubspaceEvent handles creating a subspace event
 // func (h *CausalityHandlers) CreateSubspaceEvent(w http.ResponseWriter, r *http.Request) {
-// 	// 解析请求体
+// 	// Parse request body
 // 	var requestData struct {
 // 		SubspaceID string `json:"subspace_id"`
 // 		PubKey     string `json:"pubkey"`
@@ -189,31 +189,31 @@ func (h *CausalityHandlers) ListSubspaces(w http.ResponseWriter, r *http.Request
 // 	}
 
 // 	if err := json.NewDecoder(r.Body).Decode(&requestData); err != nil {
-// 		http.Error(w, "无效的请求体", http.StatusBadRequest)
+// 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 // 		return
 // 	}
 
-// 	// 验证子空间ID
+// 	// Validate subspace ID
 // 	if !orbitdb.IsValidSubspaceID(requestData.SubspaceID) {
-// 		http.Error(w, "无效的子空间ID格式", http.StatusBadRequest)
+// 		http.Error(w, "Invalid subspace ID format", http.StatusBadRequest)
 // 		return
 // 	}
 
-// 	// 获取当前的计数器值
+// 	// Get current counter value
 // 	counter, err := h.store.GetCausalityKey(r.Context(), requestData.SubspaceID, requestData.KeyID)
 // 	if err != nil {
-// 		http.Error(w, fmt.Sprintf("获取因果关系键失败: %v", err), http.StatusInternalServerError)
+// 		http.Error(w, fmt.Sprintf("Failed to get causality key: %v", err), http.StatusInternalServerError)
 // 		return
 // 	}
 
-// 	// 递增计数器
+// 	// Increment counter
 // 	newCounter := counter + 1
 
-// 	// 创建事件
+// 	// Create event
 // 	event := &nostr.Event{
 // 		PubKey:    requestData.PubKey,
 // 		CreatedAt: nostr.Now(),
-// 		Kind:      int(requestData.KeyID), // 使用KeyID作为事件Kind
+// 		Kind:      int(requestData.KeyID), // Use KeyID as event Kind
 // 		Tags: []nostr.Tag{
 // 			{"d", "subspace_op"},
 // 			{"sid", requestData.SubspaceID},
@@ -222,21 +222,21 @@ func (h *CausalityHandlers) ListSubspaces(w http.ResponseWriter, r *http.Request
 // 		Content: requestData.Content,
 // 	}
 
-// 	// 计算事件ID
-// 	err = event.Sign() // 注意：在实际使用中，应该由客户端签署
+// 	// Calculate event ID
+// 	err = event.Sign() // Note: In actual use, this should be signed by the client
 // 	if err != nil {
-// 		http.Error(w, fmt.Sprintf("签署事件失败: %v", err), http.StatusInternalServerError)
+// 		http.Error(w, fmt.Sprintf("Failed to sign event: %v", err), http.StatusInternalServerError)
 // 		return
 // 	}
 
-// 	// 保存事件
+// 	// Save event
 // 	err = h.store.SaveEvent(r.Context(), event)
 // 	if err != nil {
-// 		http.Error(w, fmt.Sprintf("保存事件失败: %v", err), http.StatusInternalServerError)
+// 		http.Error(w, fmt.Sprintf("Failed to save event: %v", err), http.StatusInternalServerError)
 // 		return
 // 	}
 
-// 	// 返回JSON响应
+// 	// Return JSON response
 // 	w.Header().Set("Content-Type", "application/json")
 // 	w.WriteHeader(http.StatusCreated)
 // 	json.NewEncoder(w).Encode(event)

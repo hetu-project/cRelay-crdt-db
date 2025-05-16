@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-// 测试子空间ID验证
+// Test subspace ID validation
 func TestIsValidSubspaceID(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -18,22 +18,22 @@ func TestIsValidSubspaceID(t *testing.T) {
 		expected bool
 	}{
 		{
-			name:     "有效的子空间ID",
+			name:     "Valid subspace ID",
 			id:       "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
 			expected: true,
 		},
 		{
-			name:     "无效的长度",
+			name:     "Invalid length",
 			id:       "0x123",
 			expected: false,
 		},
 		{
-			name:     "无效的前缀",
+			name:     "Invalid prefix",
 			id:       "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
 			expected: false,
 		},
 		{
-			name:     "无效的字符",
+			name:     "Invalid characters",
 			id:       "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdeg",
 			expected: false,
 		},
@@ -47,12 +47,12 @@ func TestIsValidSubspaceID(t *testing.T) {
 	}
 }
 
-// 测试获取子空间因果关系
+// Test getting subspace causality
 func TestGetSubspaceCausality(t *testing.T) {
 	mockDB := new(MockDocumentStore)
 	manager := NewCausalityManager(mockDB)
 
-	// 创建测试数据
+	// Create test data
 	subspaceID := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
 	now := time.Now().Unix()
 	causalityDoc := map[string]interface{}{
@@ -69,10 +69,10 @@ func TestGetSubspaceCausality(t *testing.T) {
 		"updated": float64(now),
 	}
 
-	// 设置模拟行为
+	// Set mock behavior
 	mockDB.On("Get", mock.Anything, subspaceID, nil).Return([]interface{}{causalityDoc}, nil)
 
-	// 执行测试
+	// Execute test
 	causality, err := manager.GetSubspaceCausality(context.Background(), subspaceID)
 	assert.NoError(t, err)
 	assert.NotNil(t, causality)
@@ -83,40 +83,40 @@ func TestGetSubspaceCausality(t *testing.T) {
 	assert.Equal(t, []string{"event1", "event2"}, causality.Events)
 }
 
-// 测试从事件更新因果关系
+// Test updating causality from event
 func TestUpdateFromEvent(t *testing.T) {
 	mockDB := new(MockDocumentStore)
 	manager := NewCausalityManager(mockDB)
 
-	// 创建测试事件
+	// Create test event
 	subspaceID := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
 	event := &nostr.Event{
 		ID:        "test-event",
 		PubKey:    "test-pubkey",
 		CreatedAt: nostr.Now(),
-		Kind:      30302, // 假设这是一个投票事件
+		Kind:      30302, // Assume this is a vote event
 		Tags: nostr.Tags{
 			{"sid", subspaceID},
 			{"op", "vote"},
 		},
 	}
 
-	// 设置模拟行为
+	// Set mock behavior
 	mockDB.On("Get", mock.Anything, subspaceID, nil).Return([]interface{}{}, nil)
 	mockDB.On("Put", mock.Anything, mock.Anything).Return(subspaceID, nil)
 
-	// 执行测试
+	// Execute test
 	err := manager.UpdateFromEvent(context.Background(), event)
 	assert.NoError(t, err)
 	mockDB.AssertExpectations(t)
 }
 
-// 测试获取因果关系事件
+// Test getting causality events
 func TestGetCausalityEvents(t *testing.T) {
 	mockDB := new(MockDocumentStore)
 	manager := NewCausalityManager(mockDB)
 
-	// 创建测试数据
+	// Create test data
 	subspaceID := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
 	events := []string{"event1", "event2", "event3"}
 	causalityDoc := map[string]interface{}{
@@ -127,21 +127,21 @@ func TestGetCausalityEvents(t *testing.T) {
 		"events":      events,
 	}
 
-	// 设置模拟行为
+	// Set mock behavior
 	mockDB.On("Get", mock.Anything, subspaceID, nil).Return([]interface{}{causalityDoc}, nil)
 
-	// 执行测试
+	// Execute test
 	result, err := manager.GetCausalityEvents(context.Background(), subspaceID)
 	assert.NoError(t, err)
 	assert.Equal(t, events, result)
 }
 
-// 测试获取因果关系键
+// Test getting causality key
 func TestGetCausalityKey(t *testing.T) {
 	mockDB := new(MockDocumentStore)
 	manager := NewCausalityManager(mockDB)
 
-	// 创建测试数据
+	// Create test data
 	subspaceID := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
 	keyID := uint32(1)
 	counter := uint64(5)
@@ -155,21 +155,21 @@ func TestGetCausalityKey(t *testing.T) {
 		},
 	}
 
-	// 设置模拟行为
+	// Set mock behavior
 	mockDB.On("Get", mock.Anything, subspaceID, nil).Return([]interface{}{causalityDoc}, nil)
 
-	// 执行测试
+	// Execute test
 	result, err := manager.GetCausalityKey(context.Background(), subspaceID, keyID)
 	assert.NoError(t, err)
 	assert.Equal(t, counter, result)
 }
 
-// 测试获取所有因果关系键
+// Test getting all causality keys
 func TestGetAllCausalityKeys(t *testing.T) {
 	mockDB := new(MockDocumentStore)
 	manager := NewCausalityManager(mockDB)
 
-	// 创建测试数据
+	// Create test data
 	subspaceID := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
 	keys := map[uint32]uint64{
 		1: 5,
@@ -186,21 +186,21 @@ func TestGetAllCausalityKeys(t *testing.T) {
 		},
 	}
 
-	// 设置模拟行为
+	// Set mock behavior
 	mockDB.On("Get", mock.Anything, subspaceID, nil).Return([]interface{}{causalityDoc}, nil)
 
-	// 执行测试
+	// Execute test
 	result, err := manager.GetAllCausalityKeys(context.Background(), subspaceID)
 	assert.NoError(t, err)
 	assert.Equal(t, keys, result)
 }
 
-// 测试查询子空间
+// Test querying subspaces
 func TestQuerySubspaces(t *testing.T) {
 	mockDB := new(MockDocumentStore)
 	manager := NewCausalityManager(mockDB)
 
-	// 创建测试数据
+	// Create test data
 	subspaceID := "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
 	now := time.Now().Unix()
 	causalityDoc := map[string]interface{}{
@@ -211,15 +211,15 @@ func TestQuerySubspaces(t *testing.T) {
 		"updated":     float64(now),
 	}
 
-	// 设置模拟行为
+	// Set mock behavior
 	mockDB.On("Query", mock.Anything, mock.Anything).Return([]interface{}{causalityDoc}, nil)
 
-	// 创建过滤器
+	// Create filter
 	filter := func(c *SubspaceCausality) bool {
-		return c.Updated >= now-3600 // 只返回最近一小时更新的子空间
+		return c.Updated >= now-3600 // Only return subspaces updated in the last hour
 	}
 
-	// 执行测试
+	// Execute test
 	results, err := manager.QuerySubspaces(context.Background(), filter)
 	assert.NoError(t, err)
 	assert.Len(t, results, 1)
