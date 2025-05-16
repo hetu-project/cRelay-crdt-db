@@ -138,6 +138,16 @@ func (h *EventHandlers) QueryEvents(w http.ResponseWriter, r *http.Request) {
 		filter.Limit = int(limit)
 	}
 
+	// 处理时间过滤
+	if since, ok := queryParams["since"].(float64); ok {
+		timestamp := nostr.Timestamp(since)
+		filter.Since = &timestamp
+	}
+	if until, ok := queryParams["until"].(float64); ok {
+		timestamp := nostr.Timestamp(until)
+		filter.Until = &timestamp
+	}
+
 	// 特殊处理自定义标签过滤
 	filter.Tags = make(nostr.TagMap)
 
@@ -153,7 +163,6 @@ func (h *EventHandlers) QueryEvents(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 处理parent标签
-
 	if parent, ok := queryParams["parent"].([]interface{}); ok && len(parent) > 0 {
 		parentValues := make([]string, 0)
 		for _, s := range parent {
