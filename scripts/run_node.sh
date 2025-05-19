@@ -60,8 +60,7 @@ install_nak() {
         cd cRelay-nak
         
         # Build and install
-        go build -o nak ./cmd/nak
-        sudo mv nak /usr/local/bin/
+        go install ./...
         
         # Verify installation
         if ! command -v nak &> /dev/null; then
@@ -101,7 +100,10 @@ init_ipfs() {
 start_nak() {
     echo "🚀 Starting nak service..."
     export IPFS_PATH="$IPFS_DIR"
-    nohup nak serve --hostname 0.0.0.0 > "$NAK_LOG" 2>&1 &
+        nohup nak serve \
+        --hostname 0.0.0.0 \
+        --orbitdb-dir "$DEFAULT_DATA_DIR/orbitdb" \
+        > "$NAK_LOG" 2>&1 &
     
     # Wait and extract key information
     echo "⏳ Waiting for nak service initialization..."
@@ -132,7 +134,11 @@ start_nak() {
 # 6. Start orbitabi service
 start_orbitabi() {
     echo "🚀 Starting cRelay-crdt-db service..."
-    nohup cRelay-crdt-db -db "$DB_ADDRESS" -Multiaddr "$MULTIADDR" > "$ORBITABI_LOG" 2>&1 &
+        nohup orbitabi \
+        -db "$DB_ADDRESS" \
+        -Multiaddr "$MULTIADDR" \
+        -orbitdb-dir "$DEFAULT_API_DATA_DIR/orbitdb" \
+        > "$ORBITABI_LOG" 2>&1 &
     
     # Verify startup
     sleep 3
@@ -150,6 +156,7 @@ start_orbitabi() {
 
 # Main execution flow
 main() {
+    clean_previous_data
     install_ipfs
     install_nak
     clean_ipfs_locks
